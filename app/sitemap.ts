@@ -1,4 +1,3 @@
-// app/sitemap.ts
 import { MetadataRoute } from 'next';
 import { createClient } from '@sanity/client';
 
@@ -17,8 +16,8 @@ const sanityClient = createClient({
   useCdn: true,
 });
 
-// 🚀 URL Domain Utama islami.or.id
-const BASE_URL = 'https://www.islami.or.id';
+// 🚀 URL Domain Utama mukhlasin.or.id
+const BASE_URL = 'https://mukhlasin.or.id';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   

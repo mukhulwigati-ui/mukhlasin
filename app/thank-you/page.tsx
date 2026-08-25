@@ -1,16 +1,15 @@
-// app/thank-you/page.tsx
 'use client';
 
 import React, { Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 
-// 1. Komponen Utama Konten Thank You bdb.or.id
+// 1. Komponen Utama Konten Thank You mukhlasin.or.id
 function ThankYouContent() {
   const searchParams = useSearchParams();
   
-  // 🚀 DOKU COMPATIBILITY: Menangkap parameter invoice atau order id dari redirect DOKU
-  const orderId = searchParams.get('invoice_number') || searchParams.get('order_id') || searchParams.get('id') || 'INV-BDB-XXXXXX';
+  // 🚀 PAKASIR COMPATIBILITY: Menangkap parameter order_id atau invoice dari redirect Pakasir
+  const orderId = searchParams.get('order_id') || searchParams.get('invoice') || searchParams.get('id') || 'INV-MUKHLASIN-XXXXXX';
 
   return (
     <div className="w-full max-w-md bg-white border border-slate-200 shadow-sm p-5 sm:p-6 flex flex-col justify-between text-center space-y-5">
@@ -31,7 +30,7 @@ function ThankYouContent() {
         </p>
         
         <p className="text-xs sm:text-sm text-slate-700 mt-3 mb-5 leading-relaxed font-normal">
-          Infak/Sedekah Anda telah berhasil diproses melalui sistem pembayaran resmi <span className="font-semibold text-slate-900">bdb.or.id</span>. Terima kasih banyak atas kepercayaan Anda menyalurkan dana kebajikan melalui kami, semoga menjadi aliran amal jariyah yang berlipat ganda serta mendatangkan keberkahan bagi Anda sekeluarga. Aamiin.
+          Infak/Sedekah Anda telah berhasil diproses melalui sistem pembayaran resmi <span className="font-semibold text-slate-900">mukhlasin.or.id</span>. Terima kasih banyak atas kepercayaan Anda menyalurkan dana kebajikan melalui Yayasan Darul Mukhlasin Kroya, semoga menjadi aliran amal jariyah yang berlipat ganda serta mendatangkan keberkahan bagi Anda sekeluarga. Aamiin.
         </p>
 
         {/* Kotak Status Detail Transaksi */}
@@ -49,7 +48,7 @@ function ThankYouContent() {
           <div className="flex justify-between items-center text-xs sm:text-sm font-medium border-t border-slate-200 pt-2.5">
             <span className="text-slate-400 uppercase tracking-wider">Metode Pembayaran</span>
             <span className="text-slate-800 font-bold uppercase tracking-wider text-xs">
-              DOKU Checkout Resmi
+              Pakasir Payment Gateway
             </span>
           </div>
         </div>
@@ -59,7 +58,7 @@ function ThankYouContent() {
       <div className="pt-2">
         <Link 
           href="/" 
-          className="block w-full text-center bg-[#0d5c91] hover:bg-sky-900 text-white font-bold py-3.5 transition text-xs sm:text-sm uppercase tracking-wider shadow-sm"
+          className="block w-full text-center bg-[#064e3b] hover:bg-[#022c22] text-white font-bold py-3.5 transition text-xs sm:text-sm uppercase tracking-wider shadow-sm"
         >
           Kembali ke Beranda 🚀
         </Link>

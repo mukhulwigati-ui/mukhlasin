@@ -1,4 +1,3 @@
-// app/peta-situs/page.tsx
 export const dynamic = 'force-dynamic';
 
 import React from 'react';
@@ -21,13 +20,13 @@ const sanityClient = createClient({
 });
 
 // ===================================================================
-// META DATA SEO (OPEN GRAPH & METADATA LENGKAP BDB)
+// META DATA SEO (OPEN GRAPH & METADATA LENGKAP MUKHLASIN)
 // ===================================================================
 export const metadata: Metadata = {
-  title: 'Peta Situs Resmi (Sitemap) | bdb.or.id',
-  description: 'Indeks navigasi lengkap seluruh program donasi, zakat digital, infak kemanusiaan, wakaf, dan kabar berita pembaruan bdb.or.id (Balai Dakwah Banjarnegara).',
+  title: 'Peta Situs Resmi (Sitemap) | mukhlasin.or.id',
+  description: 'Indeks navigasi lengkap seluruh program donasi, zakat digital, infak kemanusiaan, wakaf, dan kabar berita pembaruan mukhlasin.or.id (Yayasan Darul Mukhlasin Kroya, Cilacap).',
   alternates: {
-    canonical: 'https://bdb.or.id/peta-situs',
+    canonical: 'https://mukhlasin.or.id/peta-situs',
   },
   robots: {
     index: true,
@@ -42,10 +41,10 @@ export const metadata: Metadata = {
     },
   },
   openGraph: {
-    title: 'Peta Situs Resmi (Sitemap) | bdb.or.id',
-    description: 'Akses cepat seluruh struktur halaman program kebaikan dan transparansi laporan bdb.or.id.',
-    url: 'https://bdb.or.id/peta-situs',
-    siteName: 'bdb.or.id',
+    title: 'Peta Situs Resmi (Sitemap) | mukhlasin.or.id',
+    description: 'Akses cepat seluruh struktur halaman program kebaikan dan transparansi laporan mukhlasin.or.id.',
+    url: 'https://mukhlasin.or.id/peta-situs',
+    siteName: 'mukhlasin.or.id',
     locale: 'id_ID',
     type: 'website',
   },
@@ -96,7 +95,7 @@ export default async function PetaSitusPage() {
             🗺️ Peta Situs Resmi (HTML Sitemap)
           </h1>
           <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-            Halaman ini disediakan untuk mempermudah perayapan indeks robot mesin pencari sekaligus membantu donatur menavigasi seluruh struktur direktori URL <span className="font-semibold text-slate-800">bdb.or.id</span> secara transparan.
+            Halaman ini disediakan untuk mempermudah perayapan indeks robot mesin pencari sekaligus membantu donatur menavigasi seluruh struktur direktori URL <span className="font-semibold text-slate-800">mukhlasin.or.id</span> secara transparan.
           </p>
         </div>
 
@@ -105,14 +104,14 @@ export default async function PetaSitusPage() {
           
           {/* KOLOM 1: HALAMAN UTAMA & INTERNAL */}
           <div className="bg-white border border-slate-200 p-4 sm:p-5 shadow-sm space-y-3">
-            <h2 className="text-xs sm:text-sm font-extrabold text-[#0d5c91] bg-sky-50 px-3 py-1.5 uppercase tracking-wider inline-block border border-sky-100">
+            <h2 className="text-xs sm:text-sm font-extrabold text-emerald-800 bg-emerald-50 px-3 py-1.5 uppercase tracking-wider inline-block border border-emerald-100">
               📂 Halaman Utama & Fitur
             </h2>
             <ul className="space-y-3 text-xs sm:text-sm font-medium text-slate-800">
               {halamanInti.map((item, idx) => (
                 <li key={idx} className="border-b border-slate-100 pb-2.5 last:border-none">
-                  <a href={item.url} className="hover:text-[#0d5c91] transition block font-bold leading-snug">
-                    {item.title} <span className="text-[11px] text-slate-400 font-normal block mt-0.5">{`https://bdb.or.id${item.url}`}</span>
+                  <a href={item.url} className="hover:text-emerald-700 transition block font-bold leading-snug">
+                    {item.title} <span className="text-[11px] text-slate-400 font-normal block mt-0.5">{`https://mukhlasin.or.id${item.url}`}</span>
                   </a>
                 </li>
               ))}
@@ -121,15 +120,15 @@ export default async function PetaSitusPage() {
 
           {/* KOLOM 2: PROGRAM KAMPANYE AKTIF (DYNAMIC SANITY) */}
           <div className="bg-white border border-slate-200 p-4 sm:p-5 shadow-sm space-y-3">
-            <h2 className="text-xs sm:text-sm font-extrabold text-[#0d5c91] bg-sky-50 px-3 py-1.5 uppercase tracking-wider inline-block border border-sky-100">
+            <h2 className="text-xs sm:text-sm font-extrabold text-emerald-800 bg-emerald-50 px-3 py-1.5 uppercase tracking-wider inline-block border border-emerald-100">
               📦 Program Kebaikan ({programs.length})
             </h2>
             {programs.length > 0 ? (
               <ul className="space-y-3 text-xs sm:text-sm font-medium text-slate-800 max-h-[400px] overflow-y-auto pr-1">
                 {programs.map((item, idx) => (
                   <li key={idx} className="border-b border-slate-100 pb-2.5 last:border-none">
-                    <a href={`/campaign/${item.slug}`} className="hover:text-[#0d5c91] transition block font-bold leading-snug">
-                      {item.title} <span className="text-[11px] text-slate-400 font-normal block mt-0.5">{`https://bdb.or.id/campaign/${item.slug}`}</span>
+                    <a href={`/campaign/${item.slug}`} className="hover:text-emerald-700 transition block font-bold leading-snug">
+                      {item.title} <span className="text-[11px] text-slate-400 font-normal block mt-0.5">{`https://mukhlasin.or.id/campaign/${item.slug}`}</span>
                     </a>
                   </li>
                 ))}
@@ -141,15 +140,15 @@ export default async function PetaSitusPage() {
 
           {/* KOLOM 3: BERITA KEMANUSIAAN (DYNAMIC SANITY) */}
           <div className="bg-white border border-slate-200 p-4 sm:p-5 shadow-sm space-y-3">
-            <h2 className="text-xs sm:text-sm font-extrabold text-[#0d5c91] bg-sky-50 px-3 py-1.5 uppercase tracking-wider inline-block border border-sky-100">
+            <h2 className="text-xs sm:text-sm font-extrabold text-emerald-800 bg-emerald-50 px-3 py-1.5 uppercase tracking-wider inline-block border border-emerald-100">
               📰 Berita & Kabar ({news.length})
             </h2>
             {news.length > 0 ? (
               <ul className="space-y-3 text-xs sm:text-sm font-medium text-slate-800 max-h-[400px] overflow-y-auto pr-1">
                 {news.map((item, idx) => (
                   <li key={idx} className="border-b border-slate-100 pb-2.5 last:border-none">
-                    <a href={`/news/${item.slug}`} className="hover:text-[#0d5c91] transition block font-bold leading-snug">
-                      {item.title} <span className="text-[11px] text-slate-400 font-normal block mt-0.5">{`https://bdb.or.id/news/${item.slug}`}</span>
+                    <a href={`/news/${item.slug}`} className="hover:text-emerald-700 transition block font-bold leading-snug">
+                      {item.title} <span className="text-[11px] text-slate-400 font-normal block mt-0.5">{`https://mukhlasin.or.id/news/${item.slug}`}</span>
                     </a>
                   </li>
                 ))}
@@ -163,7 +162,7 @@ export default async function PetaSitusPage() {
 
         {/* FOOTER METRICS INFO */}
         <div className="text-center text-xs text-slate-400 font-medium tracking-wide pt-2">
-          © {new Date().getFullYear()} bdb.or.id. Nilai tautan peta situs dipetakan otomatis terintegrasi skema indeks.
+          © {new Date().getFullYear()} mukhlasin.or.id. Nilai tautan peta situs dipetakan otomatis terintegrasi skema indeks.
         </div>
 
       </div>
