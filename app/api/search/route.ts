@@ -7,8 +7,9 @@ import { NextResponse } from 'next/server';
 import { createClient } from 'next-sanity';
 
 const sanityClient = createClient({
-  projectId: process.env.NEXT_SANITY_PROJECT_ID || 'a45erd4y', // 🚀 AMAN: Fallback string kosong jika env belum terbaca saat build
-  dataset: process.env.NEXT_SANITY_DATASET || 'production',
+  // 🚀 Menggunakan fallback 'a45erd4y' agar konsisten dengan konfigurasi project Anda
+  projectId: process.env.NEXT_SANITY_PROJECT_ID || process.env.NEXT_PUBLIC_SANITY_PROJECT_ID || 'a45erd4y',
+  dataset: process.env.NEXT_SANITY_DATASET || process.env.NEXT_PUBLIC_SANITY_DATASET || 'production',
   apiVersion: '2026-06-20',
   useCdn: false,
 });
@@ -33,8 +34,6 @@ export async function GET(request: Request) {
     // ===================================================================
     // 🚀 JURUS SAKTI 2: Logika Kondisional Kategori (String vs Reference)
     // ===================================================================
-    // Karena 'program' menggunakan type string biasa, sedangkan 'news' kemungkinan mereferensikan dokumen kategori,
-    // kita gunakan fungsi select() atau pengondisian agar tipe datanya tidak bentrok/null.
     const query = `*[(_type == "news" || _type == "program") && title match $keyword] {
       "id": _id,
       "type": _type,

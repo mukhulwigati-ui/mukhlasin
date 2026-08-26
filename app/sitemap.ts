@@ -1,13 +1,10 @@
+// app/sitemap.ts
 import { MetadataRoute } from 'next';
 import { createClient } from '@sanity/client';
 
-// 🚀 CONFIG SANITY CLIENT UNTUK SITEMAP
-const projectId = process.env.NEXT_SANITY_PROJECT_ID;
-const dataset = process.env.NEXT_SANITY_DATASET || 'production';
-
-if (!projectId) {
-  throw new Error('🔥 GAGAL: NEXT_SANITY_PROJECT_ID belum disetel di environment variables.');
-}
+// 🚀 CONFIG SANITY CLIENT UNTUK SITEMAP DENGAN FALLBACK AMAN
+const projectId = process.env.NEXT_SANITY_PROJECT_ID || process.env.NEXT_PUBLIC_SANITY_PROJECT_ID || 'a45erd4y';
+const dataset = process.env.NEXT_SANITY_DATASET || process.env.NEXT_PUBLIC_SANITY_DATASET || 'production';
 
 const sanityClient = createClient({
   projectId,
@@ -68,7 +65,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     const data = await sanityClient.fetch(query);
 
     // 2. Mapping Rute Program / Campaign
-    if (data.programs && Array.isArray(data.programs)) {
+    if (data?.programs && Array.isArray(data.programs)) {
       campaignRoutes = data.programs.map((program: any) => ({
         url: `${BASE_URL}/campaign/${program.slug}`,
         lastModified: program._updatedAt ? new Date(program._updatedAt) : new Date(),
@@ -78,7 +75,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     }
 
     // 3. Mapping Rute Berita / News
-    if (data.news && Array.isArray(data.news)) {
+    if (data?.news && Array.isArray(data.news)) {
       newsRoutes = data.news.map((article: any) => ({
         url: `${BASE_URL}/news/${article.slug}`,
         lastModified: article.publishedAt ? new Date(article.publishedAt) : (article._updatedAt ? new Date(article._updatedAt) : new Date()),
