@@ -5,8 +5,8 @@ import { createClient } from '@sanity/client';
 export const dynamic = 'force-dynamic';
 
 const client = createClient({
-  projectId: process.env.NEXT_PUBLIC_SANITY_PROJECT_ID,
-  dataset: process.env.NEXT_PUBLIC_SANITY_DATASET || 'production',
+  projectId: process.env.NEXT_SANITY_PROJECT_ID,
+  dataset: process.env.NEXT_SANITY_DATASET || 'production',
   useCdn: false, // Wajib false agar data langsung ditarik real-time
   apiVersion: '2024-01-01',
   token: process.env.SANITY_API_TOKEN,
