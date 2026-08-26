@@ -7,8 +7,8 @@ import { NextResponse } from 'next/server';
 import { createClient } from 'next-sanity';
 
 const sanityClient = createClient({
-  projectId: process.env.NEXT_PUBLIC_SANITY_PROJECT_ID || '', // 🚀 AMAN: Fallback string kosong jika env belum terbaca saat build
-  dataset: process.env.NEXT_PUBLIC_SANITY_DATASET || 'production',
+  projectId: process.env.NEXT_SANITY_PROJECT_ID || 'a45erd4y', // 🚀 AMAN: Fallback string kosong jika env belum terbaca saat build
+  dataset: process.env.NEXT_SANITY_DATASET || 'production',
   apiVersion: '2026-06-20',
   useCdn: false,
 });
