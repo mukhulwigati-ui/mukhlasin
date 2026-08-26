@@ -22,16 +22,15 @@ export const metadata: Metadata = {
   },
 };
 
-// 🚀 INISIALISASI CLIENT DENGAN FALLBACK MUTLAK
+// 🚀 INISIALISASI CLIENT AMAN PUBLIK (Tanpa Token agar terhindar dari error session host)
 const projectId = process.env.NEXT_SANITY_PROJECT_ID || process.env.NEXT_PUBLIC_SANITY_PROJECT_ID || 'a45erd4y';
 const dataset = process.env.NEXT_PUBLIC_SANITY_DATASET || process.env.NEXT_DATASET || 'production';
 
 const serverClient = createClient({
   projectId,
   dataset,
-  useCdn: false,
+  useCdn: true, // Menggunakan CDN publik Sanity yang aman untuk data beranda
   apiVersion: '2024-01-01',
-  token: process.env.SANITY_API_TOKEN,
 });
 
 export const dynamic = 'force-dynamic';
@@ -42,7 +41,7 @@ export default async function HomePage() {
   let programsList: any[] = [];
 
   try {
-    // 🚀 QUERY PALING FLEKSIBEL: Mengambil semua jenis dokumen program/campaign & banner tanpa batasan ketat
+    // 🚀 QUERY FLEKSIBEL: Mengambil semua jenis dokumen program/campaign & banner tanpa batasan ketat
     const query = `{
       "heroBanners": *[_type in ["heroBanner", "banner", "hero"]] | order(_createdAt desc)[0...5] {
         "id": _id,
