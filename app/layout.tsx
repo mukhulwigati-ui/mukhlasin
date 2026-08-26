@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import LayoutClientWrapper from "@/components/LayoutClientWrapper"; // 🚀 Menggunakan LayoutClientWrapper yang sudah ada
-import BottomNav from "@/components/BottomNav"; // 🚀 Import BottomNav Global
+import LayoutClientWrapper from "@/components/LayoutClientWrapper";
+import BottomNav from "@/components/BottomNav";
 import Script from "next/script";
 import "./globals.css";
 
@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-// 🚀 MASTER SEO & PWA METADATA MUKHLASIN.OR.ID (100% Didukung di Server Component)
+// 🚀 MASTER SEO & PWA METADATA MUKHLASIN.OR.ID
 export const metadata: Metadata = {
   title: {
     default: "mukhlasin.or.id | Yayasan Darul Mukhlasin Kroya - Platform Sedekah, Infaq & Zakat Online Amanah",
@@ -51,7 +51,7 @@ export const metadata: Metadata = {
   },
   openGraph: {
     title: "mukhlasin.or.id | Yayasan Darul Mukhlasin Kroya - Platform Sedekah, Infaq & Zakat Online Amanah",
-    description: "Tunaikan kepedulian Anda dengan mudah bersama Yayasan Darul Mukhlasin Kroya, Cilacap (mukhlasin.or.id). Salurkan sedekah subuh, infaq produktif, dan zakat mal/fitrah secara transparan dan otomatis via QRIS & Virtual Account.",
+    description: "Tunaikan kepedulian Anda dengan mudah bersama Yayasan Darul Mukhlasin Kroya, Cilacap (mukhlasin.or.id). Salurkan sedekah subuh, infaq produktif, dan zakat mal/fitrah secara transparan dan otomatis.",
     url: "https://mukhlasin.or.id",
     siteName: "mukhlasin.or.id",
     locale: "id_ID",
@@ -62,14 +62,14 @@ export const metadata: Metadata = {
         width: 1200,
         height: 630,
         type: "image/png",
-        alt: "mukhlasin.or.id - Yayasan Darul Mukhlasin Kroya - Mengalirkan Keberkahan Melalui Sedekah dan Infaq",
+        alt: "mukhlasin.or.id - Yayasan Darul Mukhlasin Kroya",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
     title: "mukhlasin.or.id | Yayasan Darul Mukhlasin Kroya - Sedekah & Infaq Online Mudah",
-    description: "Platform resmi galang donasi, sedekah, infaq, dan zakat amanah bersama mukhlasin.or.id (Yayasan Darul Mukhlasin Kroya, Cilacap).",
+    description: "Platform resmi galang donasi, sedekah, infaq, dan zakat amanah bersama mukhlasin.or.id.",
     images: ["https://mukhlasin.or.id/images/banner.png"],
   },
   robots: {
@@ -117,7 +117,7 @@ export default function RootLayout({
           }}
         />
 
-        {/* 🚀 LAYOUT CLIENT WRAPPER (MEMUAT CHILDREN & PWA MODAL TENGAH) */}
+        {/* 🚀 LAYOUT CLIENT WRAPPER */}
         <LayoutClientWrapper>
           {children}
         </LayoutClientWrapper>
