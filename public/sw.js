@@ -1,20 +1,19 @@
 // public/sw.js
 
-const CACHE_NAME = 'bdb-pwa-cache-v1';
-const OFFLINE_URL = '/offline'; // Pastikan Anda memiliki halaman offline jika diperlukan, atau ganti ke '/'
+const CACHE_NAME = 'mukhlasin-pwa-cache-v1';
 
 // Daftar aset inti yang langsung dicache saat instalasi
 const PRECACHE_ASSETS = [
   '/',
   '/manifest.json',
-  '/images/logo-bdb.png'
+  '/images/logo-mukhlasin.png'
 ];
 
 // 1. INSTALL EVENT: Menyimpan aset inti ke cache
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      console.log('[Service Worker] Membuka cache dan menyimpan aset utama');
+      console.log('[Service Worker] Membuka cache dan menyimpan aset utama mukhlasin.or.id');
       return cache.addAll(PRECACHE_ASSETS);
     })
   );
@@ -38,18 +37,19 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// 3. FETCH EVENT: Strategi Network First untuk halaman dinamis / API, dan Cache First untuk aset statis
+// 3. FETCH EVENT: Strategi Stale-While-Revalidate & Pengecualian API / Payment Gateway
 self.addEventListener('fetch', (event) => {
-  // Lewati request non-GET atau request ke ekstensi chrome/api eksternal tertentu jika perlu
+  // Hanya tangani method GET
   if (event.request.method !== 'GET') return;
 
   const url = new URL(event.request.url);
 
-  // Jangan cache request ke Sanity Studio, API backend, atau Midtrans agar datanya selalu *real-time*
+  // Jangan cache request ke Sanity Studio, API backend, Pakasir, atau Midtrans agar selalu *real-time*
   if (
     url.pathname.startsWith('/studio') ||
     url.pathname.startsWith('/api/') ||
     url.hostname.includes('sanity.io') ||
+    url.hostname.includes('pakasir.com') ||
     url.hostname.includes('midtrans.com')
   ) {
     return;
@@ -57,10 +57,14 @@ self.addEventListener('fetch', (event) => {
 
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
-      // Ambil dari cache jika ada, sambil memperbarui cache dari jaringan di latar belakang (Stale-While-Revalidate)
       const fetchPromise = fetch(event.request)
         .then((networkResponse) => {
-          if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+          // Pastikan response valid sebelum dimasukkan ke cache (mendukung tipe 'basic' dan 'opaque' untuk CDN gambar)
+          if (
+            networkResponse && 
+            networkResponse.status === 200 && 
+            (networkResponse.type === 'basic' || networkResponse.type === 'opaque')
+          ) {
             const responseToCache = networkResponse.clone();
             caches.open(CACHE_NAME).then((cache) => {
               cache.put(event.request, responseToCache);
@@ -69,7 +73,7 @@ self.addEventListener('fetch', (event) => {
           return networkResponse;
         })
         .catch(() => {
-          // Fallback jika offline total dan halaman tidak ada di cache
+          // Fallback jika offline total dan halaman navigasi diminta
           if (event.request.mode === 'navigate') {
             return caches.match('/');
           }
