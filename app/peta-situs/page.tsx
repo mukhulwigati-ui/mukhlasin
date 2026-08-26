@@ -5,11 +5,11 @@ import { Metadata } from 'next';
 import { createClient } from '@sanity/client';
 
 // 🚀 CONFIG SANITY CLIENT (Murni dari Environment Variables)
-const projectId = process.env.NEXT_PUBLIC_SANITY_PROJECT_ID;
-const dataset = process.env.NEXT_PUBLIC_SANITY_DATASET || 'production';
+const projectId = process.env.NEXT_SANITY_PROJECT_ID;
+const dataset = process.env.NEXT_SANITY_DATASET || 'production';
 
 if (!projectId) {
-  throw new Error('🔥 GAGAL: NEXT_PUBLIC_SANITY_PROJECT_ID belum disetel di environment variables.');
+  throw new Error('🔥 GAGAL: NEXT_SANITY_PROJECT_ID belum disetel di environment variables.');
 }
 
 const sanityClient = createClient({

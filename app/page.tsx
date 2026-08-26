@@ -40,11 +40,11 @@ export const metadata: Metadata = {
 };
 
 // 🚀 INITIALIZE SANITY CLIENT
-const projectId = process.env.NEXT_PUBLIC_SANITY_PROJECT_ID || 'ks29gg6v';
-const dataset = process.env.NEXT_PUBLIC_SANITY_DATASET || 'production';
+const projectId = process.env.NEXT_SANITY_PROJECT_ID || 'ks29gg6v';
+const dataset = process.env.NEXT_SANITY_DATASET || 'production';
 
 if (!projectId) {
-  throw new Error('🔥 GAGAL: NEXT_PUBLIC_SANITY_PROJECT_ID belum disetel di environment variables.');
+  throw new Error('🔥 GAGAL: NEXT_SANITY_PROJECT_ID belum disetel di environment variables.');
 }
 
 const serverClient = createClient({
