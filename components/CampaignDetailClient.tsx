@@ -4,7 +4,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { PortableText } from '@portabletext/react';
-import { ArrowLeft, Share2, Copy, Check, MessageCircle, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, Share2, Copy, Check, MessageCircle } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client'; 
 
 // ===================================================================
@@ -158,6 +158,8 @@ const DonationFormFields = ({
   setProfile,
   amount,
   setAmount,
+  paymentMethod,
+  setPaymentMethod,
   handleDonate,
   handleInlineSavePhone,
   submitting,
@@ -208,6 +210,22 @@ const DonationFormFields = ({
             }}
           />
         </div>
+      </div>
+
+      {/* Pilih Metode Pembayaran */}
+      <div>
+        <label className="text-xs sm:text-sm font-extrabold text-slate-900 block mb-2">Metode Pembayaran</label>
+        <select
+          value={paymentMethod}
+          onChange={(e) => setPaymentMethod(e.target.value)}
+          className="w-full border border-gray-300 px-3.5 py-2.5 text-sm font-semibold text-slate-800 bg-white focus:outline-emerald-900 rounded-xl"
+        >
+          <option value="qris">QRIS (Semua E-Wallet / Mobile Banking)</option>
+          <option value="bni_va">Virtual Account BNI</option>
+          <option value="bri_va">Virtual Account BRI</option>
+          <option value="mandiri_va">Virtual Account Mandiri</option>
+          <option value="permata_va">Virtual Account Permata</option>
+        </select>
       </div>
 
       <hr className="border-slate-100 my-2" />
@@ -271,14 +289,13 @@ const DonationFormFields = ({
         </div>
       )}
 
-      {/* Tombol Pembayaran Pakasir */}
       <button
         type="button"
         onClick={handleDonate}
         disabled={submitting || (isLoggedIn && !hasPhone)}
         className="w-full bg-[#e91e63] hover:bg-pink-700 active:scale-[0.99] text-white font-extrabold py-4 transition text-sm sm:text-base uppercase tracking-wider disabled:bg-gray-300 shadow-md flex items-center justify-center gap-2 cursor-pointer rounded-xl mt-3"
       >
-        {submitting ? 'Memproses...' : 'Lanjut pembayaran'}
+        {submitting ? 'Memproses Tagihan...' : 'Lanjut pembayaran'}
       </button>
     </div>
   );
@@ -296,6 +313,7 @@ export default function CampaignDetailClient({ slug, referral }: CampaignDetailC
   const [program, setProgram] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [amount, setAmount] = useState('10.000'); 
+  const [paymentMethod, setPaymentMethod] = useState('qris');
   
   const [profile, setProfile] = useState<any>(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -305,6 +323,7 @@ export default function CampaignDetailClient({ slug, referral }: CampaignDetailC
   
   const [isMobileFormOpen, setIsMobileFormOpen] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+
   const [copied, setCopied] = useState(false);
   const [activeTab, setActiveTab] = useState<'cerita' | 'donatur' | 'laporan'>('cerita');
 
@@ -383,7 +402,7 @@ export default function CampaignDetailClient({ slug, referral }: CampaignDetailC
     }
   };
 
-  // 🚀 INTEGRASI CHECKOUT MENGGUNAKAN API PAKASIR
+  // 🚀 PERBAIKAN: Ganti slug 'depodomain' dengan slug asli proyek Pakasir Anda secara langsung
   const handleDonate = async () => {
     const cleanAmount = Number(String(amount || '').replace(/[^0-9]/g, ''));
     if (!cleanAmount || isNaN(cleanAmount) || cleanAmount < 1000) {
@@ -408,16 +427,26 @@ export default function CampaignDetailClient({ slug, referral }: CampaignDetailC
           donorName: profile?.name?.trim() || 'Hamba Allah',
           donorPhone: cleanPhone,
           amount: cleanAmount,
-          paymentMethod: 'qris', // Default QRIS Pakasir
+          paymentMethod: paymentMethod, 
           fundraiserPhone: referral,
         }),
       });
 
       const json = await res.json();
       
-      if (json.success && json.returnUrl) {
-        // Arahkan ke halaman terima kasih / sukses setelah transaksi Pakasir dibuat
-        window.location.href = json.returnUrl;
+      if (json.success && json.orderId) {
+        // Ganti 'balai-dakwah-banjarnegara' di bawah ini jika slug Pakasir Anda berbeda
+        const projectSlug = process.env.NEXT_PUBLIC_PAKASIR_PROJECT_SLUG || 'balai-dakwah-banjarnegara';
+        const siteUrl = window.location.origin; 
+        const returnUrl = `${siteUrl}/thank-you?order_id=${json.orderId}`;
+
+        let pakasirPayUrl = `https://app.pakasir.com/pay/${projectSlug}/${cleanAmount}?order_id=${json.orderId}&redirect=${encodeURIComponent(returnUrl)}`;
+        
+        if (paymentMethod === 'qris') {
+          pakasirPayUrl += `&qris_only=1`;
+        }
+
+        window.location.href = pakasirPayUrl;
       } else {
         alert(json.error || 'Gagal memproses transaksi.');
         setSubmitting(false);
@@ -625,6 +654,7 @@ export default function CampaignDetailClient({ slug, referral }: CampaignDetailC
             <DonationFormFields 
               profile={profile} setProfile={setProfile}
               amount={amount} setAmount={setAmount}
+              paymentMethod={paymentMethod} setPaymentMethod={setPaymentMethod}
               handleDonate={handleDonate}
               handleInlineSavePhone={handleInlineSavePhone}
               submitting={submitting}
