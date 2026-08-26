@@ -27,41 +27,23 @@ interface CampaignProps {
 }
 
 export default function Campaign({ initialData = [], mendesak = [], unggulan = [], pilihan = [] }: CampaignProps) {
-  // Helper aman untuk mengambil nilai uang terkumpul
   const getCollected = (item: CampaignItem) => Number(item.collectedAmount ?? item.collectedRaw ?? 0);
 
-  // 🚀 Helper mutlak untuk memastikan jumlah donatur tidak pernah 0 jika dana sudah terkumpul
   const getDonorsCount = (item: CampaignItem) => {
     if (item.donorsCount && item.donorsCount > 0) return item.donorsCount;
     if (item.donors && item.donors.length > 0) return item.donors.length;
-    
-    // Fallback paksa: Jika dana sudah terkumpul, estimasikan minimal 1 atau hitung berdasarkan nominal
     const collected = getCollected(item);
     if (collected > 0) {
-      return Math.max(1, Math.floor(collected / 50000)); // Estimasi rata-rata donasi 50rb per orang
+      return Math.max(1, Math.floor(collected / 50000));
     }
     return 0;
   };
-
-  // 🚀 PENGAMAN UTAMA: Jika section spesifik kosong tapi ada data lain / initialData, distribusikan secara cerdas
-  let finalMendesak = mendesak;
-  let finalUnggulan = unggulan;
-  let finalPilihan = pilihan;
-
-  if (finalMendesak.length === 0 && finalUnggulan.length === 0 && finalPilihan.length === 0 && initialData.length > 0) {
-    finalPilihan = initialData;
-  } else {
-    // Jika ada kategori yang kosong, fallback ke data dari kategori lain agar UI tetap terisi
-    if (finalMendesak.length === 0) finalMendesak = finalPilihan.slice(0, 4);
-    if (finalUnggulan.length === 0) finalUnggulan = finalPilihan.slice(0, 4);
-    if (finalPilihan.length === 0) finalPilihan = [...finalMendesak, ...finalUnggulan].slice(0, 6);
-  }
 
   return (
     <div className="space-y-6 w-full text-left">
       
       {/* ================= SECTION 1: PENGGALANGAN DANA MENDESAK ================= */}
-      {finalMendesak.length > 0 && (
+      {mendesak.length > 0 && (
         <section className="bg-white p-4 sm:p-5 border border-gray-200/90 shadow-sm space-y-3.5 rounded-xl">
           <div className="flex justify-between items-center">
             <h2 className="text-base sm:text-lg font-extrabold text-slate-900 tracking-tight">Penggalangan Dana Mendesak</h2>
@@ -72,7 +54,7 @@ export default function Campaign({ initialData = [], mendesak = [], unggulan = [
           <p className="text-xs sm:text-sm text-slate-500 font-normal">Pilih program yang berarti bagi Anda dan Mereka</p>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
-            {finalMendesak.map((item) => {
+            {mendesak.map((item) => {
               const collected = getCollected(item);
               const target = item.targetAmount || item.targetRaw || 50000000;
               const percentage = Math.min(Math.round((collected / target) * 100), 100);
@@ -105,7 +87,7 @@ export default function Campaign({ initialData = [], mendesak = [], unggulan = [
       )}
 
       {/* ================= SECTION 2: PROGRAM UNGGULAN ================= */}
-      {finalUnggulan.length > 0 && (
+      {unggulan.length > 0 && (
         <section className="bg-white p-4 sm:p-5 border border-gray-200/90 shadow-sm space-y-3.5 rounded-xl">
           <div className="flex justify-between items-center">
             <h2 className="text-base sm:text-lg font-extrabold text-slate-900 tracking-tight">Program Unggulan</h2>
@@ -116,7 +98,7 @@ export default function Campaign({ initialData = [], mendesak = [], unggulan = [
           <p className="text-xs sm:text-sm text-slate-500 font-normal">Pilih program yang berarti bagi Anda dan Mereka</p>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
-            {finalUnggulan.map((item) => {
+            {unggulan.map((item) => {
               const collected = getCollected(item);
               const target = item.targetAmount || item.targetRaw || 50000000;
               const percentage = Math.min(Math.round((collected / target) * 100), 100);
@@ -144,7 +126,7 @@ export default function Campaign({ initialData = [], mendesak = [], unggulan = [
       )}
 
       {/* ================= SECTION 3: PROGRAM PILIHAN ================= */}
-      {finalPilihan.length > 0 && (
+      {pilihan.length > 0 && (
         <section className="bg-white p-4 sm:p-5 border border-gray-200/90 shadow-sm space-y-3.5 rounded-xl">
           <div className="flex justify-between items-center">
             <h2 className="text-base sm:text-lg font-extrabold text-slate-900 tracking-tight">Program Pilihan</h2>
@@ -155,7 +137,7 @@ export default function Campaign({ initialData = [], mendesak = [], unggulan = [
           <p className="text-xs sm:text-sm text-slate-500 font-normal">Pilih program yang berarti bagi Anda dan Mereka</p>
 
           <div className="space-y-3.5 pt-1">
-            {finalPilihan.map((item) => {
+            {pilihan.map((item) => {
               const collected = getCollected(item);
               const donorCount = getDonorsCount(item);
               return (

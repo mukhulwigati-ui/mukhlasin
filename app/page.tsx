@@ -22,14 +22,14 @@ export const metadata: Metadata = {
   },
 };
 
-// 🚀 INISIALISASI CLIENT AMAN PUBLIK (Tanpa Token agar terhindar dari error session host)
+// 🚀 INISIALISASI CLIENT AMAN PUBLIK
 const projectId = process.env.NEXT_SANITY_PROJECT_ID || process.env.NEXT_PUBLIC_SANITY_PROJECT_ID || 'a45erd4y';
 const dataset = process.env.NEXT_PUBLIC_SANITY_DATASET || process.env.NEXT_DATASET || 'production';
 
 const serverClient = createClient({
   projectId,
   dataset,
-  useCdn: true, // Menggunakan CDN publik Sanity yang aman untuk data beranda
+  useCdn: true,
   apiVersion: '2024-01-01',
 });
 
@@ -38,10 +38,12 @@ export const revalidate = 0;
 
 export default async function HomePage() {
   let heroBanners: HeroBanner[] = [];
-  let programsList: any[] = [];
+  let mendesakPrograms: any[] = [];
+  let unggulanPrograms: any[] = [];
+  let pilihanPrograms: any[] = [];
 
   try {
-    // 🚀 QUERY FLEKSIBEL: Mengambil semua jenis dokumen program/campaign & banner tanpa batasan ketat
+    // 🚀 QUERY SPESIFIK PER KATEGORI: Memisahkan data berdasarkan sectionType masing-masing
     const query = `{
       "heroBanners": *[_type in ["heroBanner", "banner", "hero"]] | order(_createdAt desc)[0...5] {
         "id": _id,
@@ -49,7 +51,27 @@ export default async function HomePage() {
         "imageUrl": coalesce(image.asset->url, banner.asset->url, mainImage.asset->url),
         "linkUrl": coalesce(link, slug.current)
       },
-      "programs": *[_type in ["program", "campaign", "donasi"]] | order(_createdAt desc)[0...12] {
+      "mendesak": *[_type in ["program", "campaign", "donasi"] && sectionType == "mendesak"] | order(_createdAt desc)[0...4] {
+        "id": _id,
+        "title": coalesce(title, name, "Program Donasi"),
+        "slug": coalesce(slug.current, slug, _id),
+        "image": coalesce(image.asset->url, mainImage.asset->url, thumbnail.asset->url, banner.asset->url),
+        "collectedAmount": coalesce(collectedAmount, collectedRaw, 0),
+        "targetAmount": coalesce(targetAmount, 50000000),
+        "daysLeft": coalesce(daysLeft, 30),
+        "donors": donors
+      },
+      "unggulan": *[_type in ["program", "campaign", "donasi"] && sectionType == "unggulan"] | order(_createdAt desc)[0...4] {
+        "id": _id,
+        "title": coalesce(title, name, "Program Donasi"),
+        "slug": coalesce(slug.current, slug, _id),
+        "image": coalesce(image.asset->url, mainImage.asset->url, thumbnail.asset->url, banner.asset->url),
+        "collectedAmount": coalesce(collectedAmount, collectedRaw, 0),
+        "targetAmount": coalesce(targetAmount, 50000000),
+        "daysLeft": coalesce(daysLeft, 30),
+        "donors": donors
+      },
+      "pilihan": *[_type in ["program", "campaign", "donasi"] && sectionType == "pilihan"] | order(_createdAt desc)[0...6] {
         "id": _id,
         "title": coalesce(title, name, "Program Donasi"),
         "slug": coalesce(slug.current, slug, _id),
@@ -63,7 +85,7 @@ export default async function HomePage() {
 
     const data = await serverClient.fetch(query);
 
-    // 1. Mapping Banners dengan fallback gambar default jika kosong
+    // 1. Mapping Banners
     if (data?.heroBanners && Array.isArray(data.heroBanners)) {
       heroBanners = data.heroBanners.map((item: any) => ({
         _id: item.id || Math.random().toString(),
@@ -73,7 +95,6 @@ export default async function HomePage() {
       }));
     }
 
-    // Jika banner dari Sanity benar-benar kosong sama sekali, sediakan dummy banner agar komponen Hero tidak error/patah
     if (heroBanners.length === 0) {
       heroBanners = [
         {
@@ -84,16 +105,13 @@ export default async function HomePage() {
       ];
     }
 
-    programsList = data?.programs || [];
+    mendesakPrograms = data?.mendesak || [];
+    unggulanPrograms = data?.unggulan || [];
+    pilihanPrograms = data?.pilihan || [];
 
   } catch (err) {
     console.error('🔥 Gagal mengambil data homepage dari Sanity:', err);
   }
-
-  // Distribusikan program ke masing-masing kategori secara otomatis
-  const mendesakPrograms = programsList.slice(0, 4);
-  const unggulanPrograms = programsList.slice(4, 8);
-  const pilihanPrograms = programsList.slice(0, 6);
 
   return (
     <main className="min-h-screen bg-gray-50 flex flex-col items-center justify-start w-full overflow-x-hidden pb-24">
@@ -103,6 +121,7 @@ export default async function HomePage() {
         
         <TotalAccumulationWidget />
         
+        {/* Masing-masing kategori menerima datanya sendiri secara independen */}
         <Campaign 
           mendesak={mendesakPrograms} 
           unggulan={unggulanPrograms} 
