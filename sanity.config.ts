@@ -16,7 +16,7 @@ export default defineConfig([
   {
     name: 'Yayasan-Darul-Mukhlasin-Kroya',
     title: 'mukhlasin.or.id',
-    projectId: 'a45erd4y',
+    projectId: 'ks29gg6v',
     dataset: 'production',
     basePath: '/studio',
 

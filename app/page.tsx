@@ -39,13 +39,9 @@ export const metadata: Metadata = {
   },
 };
 
-// 🚀 INITIALIZE SANITY CLIENT
-const projectId = process.env.NEXT_SANITY_PROJECT_ID || 'ks29gg6v';
-const dataset = process.env.NEXT_SANITY_DATASET || 'production';
-
-if (!projectId) {
-  throw new Error('🔥 GAGAL: NEXT_SANITY_PROJECT_ID belum disetel di environment variables.');
-}
+// 🚀 INITIALIZE SANITY CLIENT DENGAN AMAN
+const projectId = process.env.NEXT_SANITY_PROJECT_ID || process.env.NEXT_PUBLIC_SANITY_PROJECT_ID || 'a45erd4y';
+const dataset = process.env.NEXT_DATASET || process.env.NEXT_PUBLIC_SANITY_DATASET || 'production';
 
 const serverClient = createClient({
   projectId,
@@ -98,7 +94,8 @@ export default async function HomePage() {
         "id": _id,
         "title": title,
         "slug": slug.current,
-        "image": image.asset->url,
+        "image": slug.current,
+        "imageUrl": image.asset->url,
         "collectedAmount": coalesce(collectedAmount, collectedRaw, 0),
         "collectedRaw": coalesce(collectedAmount, collectedRaw, 0),
         "targetAmount": coalesce(targetAmount, 50000000),
