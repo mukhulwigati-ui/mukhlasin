@@ -38,25 +38,23 @@ export default defineConfig([
               'div',
               {
                 style: {
-                  // 🚀 Diubah menjadi hijau yang jauh lebih gelap agar logo lebih jelas & kontras
-                  background: '#064e3b', 
+                  // 🚀 Diubah menjadi abu-abu soft agar logo hijau terlihat sangat kontras & jelas
+                  background: '#f8fafc', 
                   padding: '16px 24px',
                   display: 'flex',
                   alignItems: 'center',
-                  borderBottom: '1px solid #022c22',
-                  boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
+                  borderBottom: '1px solid #e2e8f0',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
                 }
               },
               React.createElement('img', {
-                src: '/images/logo-mukhlasin.png', // Sesuaikan path file logo jika berbeda
+                src: '/images/logo-mukhlasin.png',
                 alt: 'Logo mukhlasin.or.id',
                 style: {
                   height: '52px', 
                   width: 'auto',
                   objectFit: 'contain',
                   display: 'block',
-                  // Jika logo Anda berwarna putih/terang, aktifkan filter di bawah ini
-                  // filter: 'brightness(0) invert(1)', 
                 }
               })
             ),
