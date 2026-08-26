@@ -1,3 +1,4 @@
+// app/page.tsx
 import React from 'react';
 import { Metadata } from 'next';
 import { createClient } from '@sanity/client';
@@ -39,9 +40,9 @@ export const metadata: Metadata = {
   },
 };
 
-// 🚀 INITIALIZE SANITY CLIENT DENGAN AMAN
+// 🚀 INITIALIZE SANITY CLIENT (Menggunakan NEXT_PUBLIC_SANITY_DATASET & Project ID a45erd4y)
 const projectId = process.env.NEXT_SANITY_PROJECT_ID || process.env.NEXT_PUBLIC_SANITY_PROJECT_ID || 'a45erd4y';
-const dataset = process.env.NEXT_DATASET || process.env.NEXT_PUBLIC_SANITY_DATASET || 'production';
+const dataset = process.env.NEXT_PUBLIC_SANITY_DATASET || process.env.NEXT_DATASET || 'production';
 
 const serverClient = createClient({
   projectId,
@@ -61,7 +62,7 @@ export default async function HomePage() {
   let pilihanPrograms: any[] = [];
 
   try {
-    // 🚀 Perbaikan Query GROQ: Mengutamakan collectedAmount agar langsung terbaca akurat
+    // 🚀 Query GROQ dengan fallback fleksibel agar program langsung muncul
     const query = `{
       "heroBanners": *[_type in ["heroBanner", "banner"] && active != false] | order(order asc, _createdAt desc)[0...10] {
         "id": _id,
@@ -69,7 +70,7 @@ export default async function HomePage() {
         "imageUrl": coalesce(image.asset->url, banner.asset->url),
         "linkUrl": link
       },
-      "mendesak": *[_type == "program" && sectionType == "mendesak"] | order(_createdAt desc)[0...5] {
+      "mendesak": *[_type == "program" && (sectionType == "mendesak" || !defined(sectionType))] | order(_createdAt desc)[0...6] {
         "id": _id,
         "title": title,
         "slug": slug.current,
@@ -80,7 +81,7 @@ export default async function HomePage() {
         "daysLeft": daysLeft,
         "donors": donors
       },
-      "unggulan": *[_type == "program" && sectionType == "unggulan"] | order(_createdAt desc)[0...5] {
+      "unggulan": *[_type == "program" && (sectionType == "unggulan" || !defined(sectionType))] | order(_createdAt desc)[0...6] {
         "id": _id,
         "title": title,
         "slug": slug.current,
@@ -90,12 +91,11 @@ export default async function HomePage() {
         "targetAmount": coalesce(targetAmount, 50000000),
         "donors": donors
       },
-      "pilihan": *[_type == "program" && (sectionType == "pilihan" || !defined(sectionType))] | order(_createdAt desc)[0...5] {
+      "pilihan": *[_type == "program"] | order(_createdAt desc)[0...6] {
         "id": _id,
         "title": title,
         "slug": slug.current,
-        "image": slug.current,
-        "imageUrl": image.asset->url,
+        "image": image.asset->url,
         "collectedAmount": coalesce(collectedAmount, collectedRaw, 0),
         "collectedRaw": coalesce(collectedAmount, collectedRaw, 0),
         "targetAmount": coalesce(targetAmount, 50000000),
@@ -107,7 +107,7 @@ export default async function HomePage() {
     const data = await serverClient.fetch(query);
 
     // Mapping Hero Banners
-    if (data.heroBanners && Array.isArray(data.heroBanners)) {
+    if (data?.heroBanners && Array.isArray(data.heroBanners)) {
       heroBanners = data.heroBanners
         .filter((item: any) => item && item.imageUrl)
         .map((item: any) => ({
@@ -118,9 +118,9 @@ export default async function HomePage() {
         }));
     }
 
-    mendesakPrograms = data.mendesak || [];
-    unggulanPrograms = data.unggulan || [];
-    pilihanPrograms = data.pilihan || [];
+    mendesakPrograms = data?.mendesak || [];
+    unggulanPrograms = data?.unggulan || [];
+    pilihanPrograms = data?.pilihan || [];
 
   } catch (err) {
     console.error('🔥 Gagal mengambil data homepage dari Sanity:', err);
