@@ -1,4 +1,3 @@
-// app/page.tsx
 import React from 'react';
 import { Metadata } from 'next';
 import { createClient } from '@sanity/client';
@@ -10,43 +9,39 @@ import Footer from '@/components/Footer';
 
 // 🚀 METADATA OPEN GRAPH UNTUK SOSIAL MEDIA SHARING
 export const metadata: Metadata = {
-  title: 'bdb.or.id | Balai Dakwah Banjarnegara - Platform Sedekah, Zakat, dan Wakaf Terpercaya',
-  description: 'Salurkan sedekah, infak, zakat, dan wakaf terbaik Anda melalui program terpercaya di bdb.or.id.',
+  title: 'mukhlasin.or.id | Yayasan Darul Mukhlasin Kroya - Platform Sedekah, Zakat, dan Wakaf Terpercaya',
+  description: 'Salurkan sedekah, infak, zakat, dan wakaf terbaik Anda melalui program terpercaya di mukhlasin.or.id.',
   alternates: {
-    canonical: 'https://bdb.or.id',
+    canonical: 'https://mukhlasin.or.id',
   },
   openGraph: {
-    title: 'bdb.or.id | Balai Dakwah Banjarnegara - Platform Sedekah, Zakat, dan Wakaf Terpercaya',
-    description: 'Salurkan sedekah, infak, zakat, dan wakaf terbaik Anda melalui program terpercaya di bdb.or.id.',
-    url: 'https://bdb.or.id',
-    siteName: 'bdb.or.id',
+    title: 'mukhlasin.or.id | Yayasan Darul Mukhlasin Kroya - Platform Sedekah, Zakat, dan Wakaf Terpercaya',
+    description: 'Salurkan sedekah, infak, zakat, dan wakaf terbaik Anda melalui program terpercaya di mukhlasin.or.id.',
+    url: 'https://mukhlasin.or.id',
+    siteName: 'mukhlasin.or.id',
     locale: 'id_ID',
     type: 'website',
     images: [
       {
-        url: 'https://bdb.or.id/images/banner.png',
+        url: 'https://mukhlasin.or.id/images/banner.png',
         width: 1200,
         height: 630,
-        alt: 'bdb.or.id - Balai Dakwah Banjarnegara - Platform Kebaikan',
+        alt: 'mukhlasin.or.id - Yayasan Darul Mukhlasin Kroya - Platform Kebaikan',
         type: 'image/png',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'bdb.or.id | Balai Dakwah Banjarnegara - Platform Sedekah, Zakat, dan Wakaf Terpercaya',
-    description: 'Salurkan sedekah, infak, zakat, dan wakaf terbaik Anda melalui program terpercaya di bdb.or.id.',
-    images: ['https://bdb.or.id/images/banner.png'],
+    title: 'mukhlasin.or.id | Yayasan Darul Mukhlasin Kroya - Platform Sedekah, Zakat, dan Wakaf Terpercaya',
+    description: 'Salurkan sedekah, infak, zakat, dan wakaf terbaik Anda melalui program terpercaya di mukhlasin.or.id.',
+    images: ['https://mukhlasin.or.id/images/banner.png'],
   },
 };
 
-// 🚀 INITIALIZE SANITY CLIENT
-const projectId = process.env.NEXT_PUBLIC_SANITY_PROJECT_ID || 'xqggeww8';
-const dataset = process.env.NEXT_PUBLIC_SANITY_DATASET || 'production';
-
-if (!projectId) {
-  throw new Error('🔥 GAGAL: NEXT_PUBLIC_SANITY_PROJECT_ID belum disetel di environment variables.');
-}
+// 🚀 INITIALIZE SANITY CLIENT DENGAN AMAN
+const projectId = process.env.NEXT_SANITY_PROJECT_ID || process.env.NEXT_PUBLIC_SANITY_PROJECT_ID || 'a45erd4y';
+const dataset = process.env.NEXT_DATASET || process.env.NEXT_PUBLIC_SANITY_DATASET || 'production';
 
 const serverClient = createClient({
   projectId,
@@ -99,7 +94,8 @@ export default async function HomePage() {
         "id": _id,
         "title": title,
         "slug": slug.current,
-        "image": image.asset->url,
+        "image": slug.current,
+        "imageUrl": image.asset->url,
         "collectedAmount": coalesce(collectedAmount, collectedRaw, 0),
         "collectedRaw": coalesce(collectedAmount, collectedRaw, 0),
         "targetAmount": coalesce(targetAmount, 50000000),

@@ -1,22 +1,21 @@
-// app/kontak/page.tsx
 import React from 'react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
 // 🚀 MASTER SEO METADATA
 export const metadata: Metadata = {
-  title: 'Hubungi Kami | Layanan Donatur bdb.or.id',
-  description: 'Memiliki pertanyaan mengenai program infak, sedekah subuh, atau cara pembayaran QRIS? Hubungi tim admin resmi bdb.or.id (Balai Dakwah Banjarnegara) sekarang.',
-  keywords: ['kontak bdb', 'balai dakwah banjarnegara', 'nomor whatsapp bdb', 'alamat bdb.or.id', 'layanan donatur'],
+  title: 'Hubungi Kami | Layanan Donatur mukhlasin.or.id',
+  description: 'Memiliki pertanyaan mengenai program infak, sedekah subuh, atau cara pembayaran? Hubungi tim admin resmi mukhlasin.or.id (Yayasan Darul Mukhlasin Kroya, Cilacap) sekarang.',
+  keywords: ['kontak mukhlasin', 'yayasan darul mukhlasin kroya', 'nomor whatsapp mukhlasin', 'alamat mukhlasin.or.id', 'layanan donatur cilacap'],
   alternates: {
     canonical: '/kontak',
   },
 };
 
 export default function KontakPage() {
-  // Nomor WA resmi tanpa spasi/minus untuk integrasi API chat langsung
-  const officialWa = '6281225147373';
-  const defaultText = encodeURIComponent('Assalamualaikum Admin bdb.or.id, saya ingin bertanya mengenai...');
+  // Nomor WA resmi baru sesuai permintaan: +62 823-2943-8278
+  const officialWa = '6282329438278';
+  const defaultText = encodeURIComponent('Assalamualaikum Admin mukhlasin.or.id, saya ingin bertanya mengenai...');
   const waChatUrl = `https://api.whatsapp.com/send?phone=${officialWa}&text=${defaultText}`;
 
   return (
@@ -25,15 +24,15 @@ export default function KontakPage() {
       <div className="w-full max-w-md mx-auto bg-white border border-slate-200 shadow-sm p-4 sm:p-6 space-y-6">
         
         {/* HEADER KONTAK */}
-        <div className="border-b border-sky-600 pb-3 space-y-1.5">
-          <span className="text-[10px] sm:text-xs font-bold text-sky-600 uppercase tracking-widest block">
+        <div className="border-b border-emerald-600 pb-3 space-y-1.5">
+          <span className="text-[10px] sm:text-xs font-bold text-emerald-600 uppercase tracking-widest block">
             LAYANAN PUSAT INFORMASI
           </span>
           <h1 className="text-xl sm:text-2xl font-extrabold text-[#333333] tracking-tight">
             Hubungi Tim Kantor Kami
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 font-medium leading-relaxed">
-            Pintu komunikasi kami selalu terbuka lebar. Jangan ragu untuk mendiskusikan kebutuhan konsultasi zakat maal maupun kerja sama program kebaikan bersama Balai Dakwah Banjarnegara.
+            Pintu komunikasi kami selalu terbuka lebar. Jangan ragu untuk mendiskusikan kebutuhan konsultasi zakat maal maupun kerja sama program kebaikan bersama Yayasan Darul Mukhlasin Kroya, Cilacap.
           </p>
         </div>
 
@@ -52,8 +51,8 @@ export default function KontakPage() {
                 <div>
                   <h4 className="text-xs sm:text-sm font-bold text-slate-800 uppercase tracking-wide">Alamat Pusat</h4>
                   <p className="text-xs sm:text-sm text-slate-600 mt-0.5 leading-relaxed">
-                    Kantor Pelayanan bdb.or.id <br />
-                    Banjarnegara, Indonesia
+                    Kantor Pelayanan mukhlasin.or.id <br />
+                    Kroya, Kabupaten Cilacap, Jawa Tengah, Indonesia
                   </p>
                 </div>
               </div>
@@ -63,7 +62,7 @@ export default function KontakPage() {
                 <div>
                   <h4 className="text-xs sm:text-sm font-bold text-slate-800 uppercase tracking-wide">Email Korespondensi</h4>
                   <p className="text-xs sm:text-sm text-slate-600 mt-0.5">
-                    support@bdb.or.id
+                    support@mukhlasin.or.id
                   </p>
                 </div>
               </div>
@@ -92,12 +91,12 @@ export default function KontakPage() {
               Konsultasi Instan WhatsApp
             </h2>
             <p className="text-xs sm:text-sm text-emerald-800/80 leading-relaxed font-medium">
-              Lebih menyukai obrolan cepat melalui aplikasi ponsel? Hubungi nomor WhatsApp resmi penanganan layanan donatur kami untuk mendapatkan panduan cepat dari tim Customer Support bdb.or.id.
+              Lebih menyukai obrolan cepat melalui aplikasi ponsel? Hubungi nomor WhatsApp resmi penanganan layanan donatur kami untuk mendapatkan panduan cepat dari tim Customer Support mukhlasin.or.id.
             </p>
             
             <div className="bg-white border border-emerald-200 p-3.5">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Hotline Care</span>
-              <span className="text-sm sm:text-base font-extrabold text-slate-800 tracking-wide block mt-0.5">+62 812-2514-7373</span>
+              <span className="text-sm sm:text-base font-extrabold text-slate-800 tracking-wide block mt-0.5">+62 823-2943-8278</span>
             </div>
 
             <div className="pt-1">

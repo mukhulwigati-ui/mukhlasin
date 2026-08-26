@@ -4,18 +4,20 @@ import { createClient } from '@sanity/client';
 
 export const dynamic = 'force-dynamic';
 
+// 🚀 Inisialisasi Sanity Client dengan Write Token dan Project ID yang benar: a45erd4y
 const client = createClient({
-  projectId: 'ks29gg6v', 
-  dataset: 'production',
+  projectId: process.env.NEXT_SANITY_PROJECT_ID || process.env.NEXT_PUBLIC_SANITY_PROJECT_ID || 'a45erd4y',
+  dataset: process.env.NEXT_SANITY_DATASET || process.env.NEXT_PUBLIC_SANITY_DATASET || 'production',
   useCdn: false,
   apiVersion: '2026-07-18',
-  token: process.env.SANITY_API_WRITE_TOKEN || 'skTkgR8oTccSIXr6lsYEhhShtcblvWtNod41Oq1DSARiIqwBqTEpWqaaO3AFWwLKCch2Z0SviYoIOftVnn6S37ypRTvvCPmHtC9fELz2EbMnlh0Vt70al8UZZHWE6y8VvsqRA2GUYo7uhz9WhdFWkG4BPwTbwotrE3KfB3MZthvBbIo6QxrK', 
+  token: process.env.SANITY_API_WRITE_TOKEN || 'skTkgR8oTccSIXr6lsYEhhShtcblvWtNod41Oq1DSARiIqwBqTEpWqaaO3AFWwLKCch2Z0SviYoIOftVnn6S37ypRTvvCPmHtC9fELz2EbMnlh0Vt70al8UZZHWE6y8VvsqRA2GUYo7uhz9WhdFWkG4BPwTbwotrE3KfB3MZthvBbIo6QxrK',
 });
 
+// Fungsi helper untuk kirim WhatsApp via Fonnte
 async function sendFonnteNotification(targetPhone: string, donorName: string, amount: number, programTitle: string, orderId: string) {
-  const fonnteToken = process.env.FONNTE_API_TOKEN || 'UhDfk5MNYJeRHvhkWAvC'; // Fallback token langsung
+  const fonnteToken = process.env.FONNTE_API_TOKEN || 'UhDfk5MNYJeRHvhkWAvC';
   if (!fonnteToken) {
-    console.warn('[Fonnte Warning] FONNTE_API_TOKEN kosong.');
+    console.warn('[Fonnte Warning] FONNTE_API_TOKEN belum diatur di environment variables.');
     return;
   }
 
@@ -42,7 +44,11 @@ async function sendFonnteNotification(targetPhone: string, donorName: string, am
     });
 
     const result = await response.json();
-    console.log(`[Fonnte Response]`, result);
+    if (result.status) {
+      console.log(`[Fonnte] Pesan WhatsApp berhasil dikirim ke ${formattedPhone}`);
+    } else {
+      console.error('[Fonnte Error] Gagal mengirim pesan:', result);
+    }
   } catch (err) {
     console.error('[Fonnte Exception Error]:', err);
   }
@@ -53,6 +59,7 @@ export async function POST(request: Request) {
     const body = await request.json();
     console.log('[Webhook Payload diterima]:', JSON.stringify(body));
     
+    // Tangkap data dari payload webhook Pakasir
     const { amount, order_id, status, payment_method, completed_at } = body;
     const orderId = order_id;
 
@@ -61,7 +68,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid webhook payload' }, { status: 400 });
     }
 
+    console.log(`[Pakasir Webhook] Menerima webhook untuk Order ID: ${orderId} dengan status: ${status}`);
+
     if (status === 'completed' || status === 'success') {
+      
+      // 1. Cari dokumen transaksi berdasarkan orderId di Sanity
       const query = `*[_type == "donationTransaction" && orderId == $orderId][0]`;
       const transaction = await client.fetch(query, { orderId });
 
@@ -75,6 +86,7 @@ export async function POST(request: Request) {
         donorName = transaction.donorName || 'Hamba Allah';
         donationAmount = Number(transaction.amount || amount || 0);
 
+        // Perbarui status dokumen di Sanity menjadi 'success'
         await client
           .patch(transaction._id)
           .set({ 
@@ -83,8 +95,9 @@ export async function POST(request: Request) {
           })
           .commit();
 
-        console.log(`[Sanity] Transaksi ${orderId} sukses diperbarui.`);
+        console.log(`[Sanity] Transaksi ${orderId} berhasil diperbarui menjadi SUCCESS.`);
 
+        // Tangkap slug dengan aman (mendukung properti slug atau reference program)
         const programSlug = transaction.slug || transaction.programSlug;
         if (programSlug) {
           const progQuery = `*[_type == "program" && (slug.current == $slug || _id == $slug)][0]`;
@@ -107,17 +120,41 @@ export async function POST(request: Request) {
               .set({ collectedAmount: newCollected })
               .append('donors', [newDonorEntry])
               .commit();
+
+            console.log(`[Sanity] Dana program berhasil diakumulasikan.`);
           }
         }
       } else {
-        console.warn(`[Sanity Warning] Transaksi ${orderId} tidak ditemukan di database Sanity. Mencoba fallback data dari payload...`);
-        // Fallback jika transaksi tidak ditemukan di Sanity (misal tes sandbox langsung)
-        donorPhone = body.phone || body.whatsapp || '62895324383400'; // Sesuaikan jika ada
+        console.warn(`[Sanity Warning] Transaksi dengan orderId ${orderId} tidak ditemukan di database Sanity. Mencoba fallback data dari payload...`);
+        donorPhone = body.phone || body.whatsapp || '';
       }
 
-      // Paksa kirim notif Fonnte meskipun transaksi tidak ketemu di Sanity (untuk keperluan uji coba)
+      // 2. 🚀 KIRIM PESAN WHATSAPP OTOMATIS VIA FONNTE
       const targetNo = donorPhone || '62895324383400'; 
-      await sendFonnteNotification(targetNo, donorName, donationAmount, programTitle, orderId);
+      if (targetNo) {
+        await sendFonnteNotification(targetNo, donorName, donationAmount, programTitle, orderId);
+      } else {
+        console.warn(`[Fonnte Warning] Nomor WhatsApp donatur tidak ditemukan untuk Order ID: ${orderId}`);
+      }
+
+      // 3. Sinkronkan status sukses ke Google Sheet (Opsional)
+      const googleSheetScriptUrl = process.env.GOOGLE_SHEET_WEBHOOK_URL || '';
+      if (googleSheetScriptUrl && googleSheetScriptUrl.trim()) {
+        try {
+          await fetch(googleSheetScriptUrl.trim(), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              orderId: orderId,
+              status: 'success',
+              completedAt: completed_at || new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })
+            }),
+          });
+          console.log(`[Google Sheet] Status sukses disinkronkan untuk ${orderId}`);
+        } catch (sheetErr) {
+          console.error('[Google Sheet Error] Gagal memperbarui status ke sheet:', sheetErr);
+        }
+      }
     }
 
     return NextResponse.json({ success: true, message: 'Webhook processed successfully' });

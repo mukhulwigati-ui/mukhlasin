@@ -1,8 +1,7 @@
-// app/layout.tsx
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import LayoutClientWrapper from "@/components/LayoutClientWrapper"; // 🚀 Menggunakan LayoutClientWrapper yang sudah ada
-import BottomNav from "@/components/BottomNav"; // 🚀 Import BottomNav Global
+import LayoutClientWrapper from "@/components/LayoutClientWrapper";
+import BottomNav from "@/components/BottomNav";
 import Script from "next/script";
 import "./globals.css";
 
@@ -16,23 +15,24 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-// 🚀 MASTER SEO & PWA METADATA BDB.OR.ID (100% Didukung di Server Component)
+// 🚀 MASTER SEO & PWA METADATA MUKHLASIN.OR.ID
 export const metadata: Metadata = {
   title: {
-    default: "bdb.or.id | Balai Dakwah Banjarnegara - Platform Sedekah, Infaq & Zakat Online Amanah",
-    template: "%s | bdb.or.id"
+    default: "mukhlasin.or.id | Yayasan Darul Mukhlasin Kroya - Platform Sedekah, Infaq & Zakat Online Amanah",
+    template: "%s | mukhlasin.or.id"
   },
-  description: "Salurkan sedekah, infaq, zakat, dan wakaf Anda secara instan dan amanah melalui bdb.or.id (Balai Dakwah Banjarnegara). Mengalirkan keberkahan dan kepedulian untuk pemberdayaan ummat, yatim, dhuafa, dan program sosial kemanusiaan.",
+  description: "Salurkan sedekah, infaq, zakat, dan wakaf Anda secara instan dan amanah melalui mukhlasin.or.id (Yayasan Darul Mukhlasin Kroya, Cilacap). Mengalirkan keberkahan dan kepedulian untuk pemberdayaan ummat, yatim, dhuafa, dan program sosial kemanusiaan.",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Balai Dakwah Banjarnegara",
+    title: "Darul Mukhlasin",
   },
   keywords: [
-    "bdb",
-    "bdb or id",
-    "balai dakwah banjarnegara",
+    "mukhlasin",
+    "mukhlasin or id",
+    "yayasan darul mukhlasin kroya",
+    "darul mukhlasin cilacap",
     "sedekah online",
     "infaq online",
     "bayar zakat online",
@@ -42,35 +42,35 @@ export const metadata: Metadata = {
     "lembaga amil zakat amanah",
     "donasi qris instant",
   ],
-  authors: [{ name: "bdb.or.id", url: "https://bdb.or.id" }],
-  creator: "bdb.or.id",
-  publisher: "bdb.or.id",
-  metadataBase: new URL("https://bdb.or.id"),
+  authors: [{ name: "mukhlasin.or.id", url: "https://mukhlasin.or.id" }],
+  creator: "mukhlasin.or.id",
+  publisher: "mukhlasin.or.id",
+  metadataBase: new URL("https://mukhlasin.or.id"),
   alternates: {
     canonical: "/",
   },
   openGraph: {
-    title: "bdb.or.id | Balai Dakwah Banjarnegara - Platform Sedekah, Infaq & Zakat Online Amanah",
-    description: "Tunaikan kepedulian Anda dengan mudah bersama Balai Dakwah Banjarnegara (bdb.or.id). Salurkan sedekah subuh, infaq produktif, dan zakat mal/fitrah secara transparan dan otomatis via QRIS & Virtual Account.",
-    url: "https://bdb.or.id",
-    siteName: "bdb.or.id",
+    title: "mukhlasin.or.id | Yayasan Darul Mukhlasin Kroya - Platform Sedekah, Infaq & Zakat Online Amanah",
+    description: "Tunaikan kepedulian Anda dengan mudah bersama Yayasan Darul Mukhlasin Kroya, Cilacap (mukhlasin.or.id). Salurkan sedekah subuh, infaq produktif, dan zakat mal/fitrah secara transparan dan otomatis.",
+    url: "https://mukhlasin.or.id",
+    siteName: "mukhlasin.or.id",
     locale: "id_ID",
     type: "website",
     images: [
       {
-        url: "https://bdb.or.id/images/banner.png",
+        url: "https://mukhlasin.or.id/images/banner.png",
         width: 1200,
         height: 630,
         type: "image/png",
-        alt: "bdb.or.id - Balai Dakwah Banjarnegara - Mengalirkan Keberkahan Melalui Sedekah dan Infaq",
+        alt: "mukhlasin.or.id - Yayasan Darul Mukhlasin Kroya",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "bdb.or.id | Balai Dakwah Banjarnegara - Sedekah & Infaq Online Mudah",
-    description: "Platform resmi galang donasi, sedekah, infaq, dan zakat amanah bersama bdb.or.id (Balai Dakwah Banjarnegara).",
-    images: ["https://bdb.or.id/images/banner.png"],
+    title: "mukhlasin.or.id | Yayasan Darul Mukhlasin Kroya - Sedekah & Infaq Online Mudah",
+    description: "Platform resmi galang donasi, sedekah, infaq, dan zakat amanah bersama mukhlasin.or.id.",
+    images: ["https://mukhlasin.or.id/images/banner.png"],
   },
   robots: {
     index: true,
@@ -117,15 +117,7 @@ export default function RootLayout({
           }}
         />
 
-        {/* 🚀 MIDTRANS SNAP SCRIPT UTAMA (Dioptimalkan agar tidak terblokir CSP) */}
-        <Script
-          src="https://app.midtrans.com/snap/snap.js"
-          data-client-key={process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY || "Mid-client-NVjY5ccbH7M47czA"}
-          strategy="lazyOnload"
-          crossOrigin="anonymous"
-        />
-
-        {/* 🚀 LAYOUT CLIENT WRAPPER (MEMUAT CHILDREN & PWA MODAL TENGAH) */}
+        {/* 🚀 LAYOUT CLIENT WRAPPER */}
         <LayoutClientWrapper>
           {children}
         </LayoutClientWrapper>

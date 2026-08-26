@@ -1,4 +1,3 @@
-// sanity.config.ts
 import { defineConfig, buildLegacyTheme } from 'sanity';
 import { structureTool } from 'sanity/structure';
 import React from 'react';
@@ -15,9 +14,9 @@ const emeraldTheme = buildLegacyTheme({
 
 export default defineConfig([
   {
-    name: 'Balai-Dakwah-Banjarnegara',
-    title: 'bdb.or.id',
-    projectId: 'ks29gg6v',
+    name: 'Yayasan-Darul-Mukhlasin-Kroya',
+    title: 'mukhlasin.or.id',
+    projectId: 'a45erd4y',
     dataset: 'production',
     basePath: '/studio',
 
@@ -49,15 +48,15 @@ export default defineConfig([
                 }
               },
               React.createElement('img', {
-                src: '/images/logo-bdb.png',
-                alt: 'Logo bdb.or.id',
+                src: '/images/logo-mukhlasin.png', // Sesuaikan path file logo jika berbeda
+                alt: 'Logo mukhlasin.or.id',
                 style: {
                   height: '52px', 
                   width: 'auto',
                   objectFit: 'contain',
                   display: 'block',
-                  // Jika logo Anda berwarna putih/terang, ini akan membuatnya semakin pas
-                  filter: 'brightness(0) invert(1)', 
+                  // Jika logo Anda berwarna putih/terang, aktifkan filter di bawah ini
+                  // filter: 'brightness(0) invert(1)', 
                 }
               })
             ),

@@ -5,7 +5,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { PortableText } from '@portabletext/react';
 import { ArrowLeft, Share2, Copy, Check, MessageCircle } from 'lucide-react';
-import { supabase } from '@/lib/supabase/client'; 
+import { createClient } from '@/lib/supabase/client'; 
 
 // ===================================================================
 // 1. HEADER KHUSUS DETAIL PROGRAM
@@ -330,6 +330,7 @@ export default function CampaignDetailClient({ slug, referral }: CampaignDetailC
   useEffect(() => {
     async function loadProfileFromDatabase() {
       try {
+        const supabase = createClient();
         const { data: { session } } = await supabase.auth.getSession();
 
         if (!session) {
@@ -366,6 +367,7 @@ export default function CampaignDetailClient({ slug, referral }: CampaignDetailC
 
     loadProfileFromDatabase();
 
+    const supabase = createClient();
     const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
       loadProfileFromDatabase();
     });
@@ -382,6 +384,7 @@ export default function CampaignDetailClient({ slug, referral }: CampaignDetailC
 
     setSavingPhone(true);
     try {
+      const supabase = createClient();
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user) throw new Error('Sesi habis, silakan login ulang.');
 
@@ -402,7 +405,6 @@ export default function CampaignDetailClient({ slug, referral }: CampaignDetailC
     }
   };
 
-  // 🚀 PERBAIKAN: Ganti slug 'depodomain' dengan slug asli proyek Pakasir Anda secara langsung
   const handleDonate = async () => {
     const cleanAmount = Number(String(amount || '').replace(/[^0-9]/g, ''));
     if (!cleanAmount || isNaN(cleanAmount) || cleanAmount < 1000) {
@@ -435,7 +437,6 @@ export default function CampaignDetailClient({ slug, referral }: CampaignDetailC
       const json = await res.json();
       
       if (json.success && json.orderId) {
-        // Ganti 'balai-dakwah-banjarnegara' di bawah ini jika slug Pakasir Anda berbeda
         const projectSlug = process.env.NEXT_PUBLIC_PAKASIR_PROJECT_SLUG || 'balai-dakwah-banjarnegara';
         const siteUrl = window.location.origin; 
         const returnUrl = `${siteUrl}/thank-you?order_id=${json.orderId}`;

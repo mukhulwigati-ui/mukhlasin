@@ -5,12 +5,12 @@ import React, { Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 
-// 1. Komponen Utama Konten Thank You bdb.or.id
+// 1. Komponen Utama Konten Thank You mukhlasin.or.id
 function ThankYouContent() {
   const searchParams = useSearchParams();
   
-  // Menangkap parameter order id atau invoice dari redirect Pakasir
-  const orderId = searchParams.get('order_id') || searchParams.get('invoice') || searchParams.get('id') || 'INV-BDB-XXXXXX';
+  // 🚀 PAKASIR COMPATIBILITY: Menangkap parameter order_id atau invoice dari redirect Pakasir
+  const orderId = searchParams.get('order_id') || searchParams.get('invoice') || searchParams.get('id') || 'INV-MUKHLASIN-XXXXXX';
 
   return (
     <div className="w-full max-w-md bg-white border border-slate-200 shadow-sm p-5 sm:p-6 flex flex-col justify-between text-center space-y-5 rounded-2xl">
@@ -31,7 +31,7 @@ function ThankYouContent() {
         </p>
         
         <p className="text-xs sm:text-sm text-slate-700 mt-3 mb-5 leading-relaxed font-normal">
-          Infak/Sedekah Anda telah berhasil diproses melalui sistem pembayaran resmi <span className="font-semibold text-slate-900">bdb.or.id</span>. Terima kasih banyak atas kepercayaan Anda menyalurkan dana kebajikan melalui kami, semoga menjadi aliran amal jariyah yang berlipat ganda serta mendatangkan keberkahan bagi Anda sekeluarga. Aamiin.
+          Infak/Sedekah Anda telah berhasil diproses melalui sistem pembayaran resmi <span className="font-semibold text-slate-900">mukhlasin.or.id</span>. Terima kasih banyak atas kepercayaan Anda menyalurkan dana kebajikan melalui Yayasan Darul Mukhlasin Kroya, semoga menjadi aliran amal jariyah yang berlipat ganda serta mendatangkan keberkahan bagi Anda sekeluarga. Aamiin.
         </p>
 
         {/* Kotak Status Detail Transaksi */}
