@@ -2,7 +2,7 @@
       "relation": ["delegate_permission/common.handle_all_urls"],
       "target": {
         "namespace": "android_app",
-        "package_name": "id.or.bdb.www.twa",
-        "sha256_cert_fingerprints": ["FA:EE:8D:D2:D3:A5:63:2B:D7:26:EA:1B:42:F7:13:7F:48:D6:12:40:A0:96:73:2E:86:0F:06:4B:65:D0:C3:23"]
+        "package_name": "id.or.mukhlasin.twa",
+        "sha256_cert_fingerprints": ["28:6C:39:9D:28:88:18:0D:55:4B:C1:55:8C:B9:38:B8:51:29:A6:35:57:CA:96:CB:D8:ED:6A:72:96:0E:F8:CA"]
       }
     }]
