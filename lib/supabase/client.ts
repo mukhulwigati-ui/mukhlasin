@@ -1,27 +1,16 @@
 import { createBrowserClient } from '@supabase/ssr';
 
-// Fungsi helper untuk mendapatkan client secara aman (Lazy Initialization)
-export const getSupabaseClient = () => {
-  const supabaseUrl = 
-    process.env.NEXT_PUBLIC_SUPABASE_URL || 
-    process.env.NEXT_SUPABASE_URL || 
-    'https://placeholder-project.supabase.co';
+// Fungsi utama untuk membuat client Supabase secara aman saat runtime
+export function createClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_SUPABASE_ANON_KEY;
 
-  const supabaseAnonKey = 
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 
-    process.env.NEXT_SUPABASE_ANON_KEY || 
-    'placeholder-anon-key';
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error('Supabase URL and Anon Key are missing in environment variables.');
+  }
 
   return createBrowserClient(supabaseUrl, supabaseAnonKey);
-};
+}
 
-// Export instance tunggal dengan aman (menggunakan getter atau fungsi wrapper jika diperlukan, 
-// atau biarkan komponen memanggil fungsi getSupabaseClient saat runtime)
-export const supabase = {
-  // Proxy sederhana agar jika ada kode lama yang memanggil `supabase.from(...)` tetap aman saat build statis
-  from: (table: string) => getSupabaseClient().from(table),
-  auth: getSupabaseClient().auth,
-  channel: (name: string) => getSupabaseClient().channel(name),
-  removeChannel: (channel: any) => getSupabaseClient().removeChannel(channel),
-  removeAllChannels: () => getSupabaseClient().removeAllChannels(),
-};
+// ⚠️ JANGAN export objek `supabase` global di sini, 
+// karena itu yang memicu error saat prerendering / build Next.js!
