@@ -8,39 +8,21 @@ import Campaign from '@/components/Campaign';
 import News from '@/components/News';
 import Footer from '@/components/Footer';
 
-// 🚀 METADATA OPEN GRAPH UNTUK SOSIAL MEDIA SHARING
 export const metadata: Metadata = {
   title: 'mukhlasin.or.id | Yayasan Darul Mukhlasin Kroya - Platform Sedekah, Zakat, dan Wakaf Terpercaya',
   description: 'Salurkan sedekah, infak, zakat, dan wakaf terbaik Anda melalui program terpercaya di mukhlasin.or.id.',
-  alternates: {
-    canonical: 'https://mukhlasin.or.id',
-  },
+  alternates: { canonical: 'https://mukhlasin.or.id' },
   openGraph: {
-    title: 'mukhlasin.or.id | Yayasan Darul Mukhlasin Kroya - Platform Sedekah, Zakat, dan Wakaf Terpercaya',
-    description: 'Salurkan sedekah, infak, zakat, dan wakaf terbaik Anda melalui program terpercaya di mukhlasin.or.id.',
+    title: 'mukhlasin.or.id | Yayasan Darul Mukhlasin Kroya',
+    description: 'Platform sedekah, zakat, dan wakaf terpercaya.',
     url: 'https://mukhlasin.or.id',
     siteName: 'mukhlasin.or.id',
     locale: 'id_ID',
     type: 'website',
-    images: [
-      {
-        url: 'https://mukhlasin.or.id/images/banner.png',
-        width: 1200,
-        height: 630,
-        alt: 'mukhlasin.or.id - Yayasan Darul Mukhlasin Kroya - Platform Kebaikan',
-        type: 'image/png',
-      },
-    ],
-  },
-  twitter: {
-    card: 'summary_large_image',
-    title: 'mukhlasin.or.id | Yayasan Darul Mukhlasin Kroya - Platform Sedekah, Zakat, dan Wakaf Terpercaya',
-    description: 'Salurkan sedekah, infak, zakat, dan wakaf terbaik Anda melalui program terpercaya di mukhlasin.or.id.',
-    images: ['https://mukhlasin.or.id/images/banner.png'],
   },
 };
 
-// 🚀 INITIALIZE SANITY CLIENT (Menggunakan NEXT_PUBLIC_SANITY_DATASET & Project ID a45erd4y)
+// 🚀 INISIALISASI CLIENT DENGAN FALLBACK MUTLAK
 const projectId = process.env.NEXT_SANITY_PROJECT_ID || process.env.NEXT_PUBLIC_SANITY_PROJECT_ID || 'a45erd4y';
 const dataset = process.env.NEXT_PUBLIC_SANITY_DATASET || process.env.NEXT_DATASET || 'production';
 
@@ -53,89 +35,75 @@ const serverClient = createClient({
 });
 
 export const dynamic = 'force-dynamic';
-export const revalidate = 0; // 🚀 Pastikan tidak ada cache agar data selalu real-time
+export const revalidate = 0;
 
 export default async function HomePage() {
   let heroBanners: HeroBanner[] = [];
-  let mendesakPrograms: any[] = [];
-  let unggulanPrograms: any[] = [];
-  let pilihanPrograms: any[] = [];
+  let programsList: any[] = [];
 
   try {
-    // 🚀 Query GROQ dengan fallback fleksibel agar program langsung muncul
+    // 🚀 QUERY PALING FLEKSIBEL: Mengambil semua jenis dokumen program/campaign & banner tanpa batasan ketat
     const query = `{
-      "heroBanners": *[_type in ["heroBanner", "banner"] && active != false] | order(order asc, _createdAt desc)[0...10] {
+      "heroBanners": *[_type in ["heroBanner", "banner", "hero"]] | order(_createdAt desc)[0...5] {
         "id": _id,
-        "title": coalesce(title, name),
-        "imageUrl": coalesce(image.asset->url, banner.asset->url),
-        "linkUrl": link
+        "title": coalesce(title, name, "Program Kebaikan"),
+        "imageUrl": coalesce(image.asset->url, banner.asset->url, mainImage.asset->url),
+        "linkUrl": coalesce(link, slug.current)
       },
-      "mendesak": *[_type == "program" && (sectionType == "mendesak" || !defined(sectionType))] | order(_createdAt desc)[0...6] {
+      "programs": *[_type in ["program", "campaign", "donasi"]] | order(_createdAt desc)[0...12] {
         "id": _id,
-        "title": title,
-        "slug": slug.current,
-        "image": image.asset->url,
+        "title": coalesce(title, name, "Program Donasi"),
+        "slug": coalesce(slug.current, slug, _id),
+        "image": coalesce(image.asset->url, mainImage.asset->url, thumbnail.asset->url, banner.asset->url),
         "collectedAmount": coalesce(collectedAmount, collectedRaw, 0),
-        "collectedRaw": coalesce(collectedAmount, collectedRaw, 0),
         "targetAmount": coalesce(targetAmount, 50000000),
-        "daysLeft": daysLeft,
-        "donors": donors
-      },
-      "unggulan": *[_type == "program" && (sectionType == "unggulan" || !defined(sectionType))] | order(_createdAt desc)[0...6] {
-        "id": _id,
-        "title": title,
-        "slug": slug.current,
-        "image": image.asset->url,
-        "collectedAmount": coalesce(collectedAmount, collectedRaw, 0),
-        "collectedRaw": coalesce(collectedAmount, collectedRaw, 0),
-        "targetAmount": coalesce(targetAmount, 50000000),
-        "donors": donors
-      },
-      "pilihan": *[_type == "program"] | order(_createdAt desc)[0...6] {
-        "id": _id,
-        "title": title,
-        "slug": slug.current,
-        "image": image.asset->url,
-        "collectedAmount": coalesce(collectedAmount, collectedRaw, 0),
-        "collectedRaw": coalesce(collectedAmount, collectedRaw, 0),
-        "targetAmount": coalesce(targetAmount, 50000000),
-        "donorsCount": count(donors),
+        "daysLeft": coalesce(daysLeft, 30),
         "donors": donors
       }
     }`;
 
     const data = await serverClient.fetch(query);
 
-    // Mapping Hero Banners
+    // 1. Mapping Banners dengan fallback gambar default jika kosong
     if (data?.heroBanners && Array.isArray(data.heroBanners)) {
-      heroBanners = data.heroBanners
-        .filter((item: any) => item && item.imageUrl)
-        .map((item: any) => ({
-          _id: item.id || Math.random().toString(),
-          title: item.title,
-          imageUrl: item.imageUrl,
-          linkUrl: item.linkUrl || undefined,
-        }));
+      heroBanners = data.heroBanners.map((item: any) => ({
+        _id: item.id || Math.random().toString(),
+        title: item.title,
+        imageUrl: item.imageUrl || 'https://images.unsplash.com/photo-1532629345422-7515f3d16bb9?q=80&w=1200&auto=format&fit=crop',
+        linkUrl: item.linkUrl ? `/campaign/${item.linkUrl}` : undefined,
+      }));
     }
 
-    mendesakPrograms = data?.mendesak || [];
-    unggulanPrograms = data?.unggulan || [];
-    pilihanPrograms = data?.pilihan || [];
+    // Jika banner dari Sanity benar-benar kosong sama sekali, sediakan dummy banner agar komponen Hero tidak error/patah
+    if (heroBanners.length === 0) {
+      heroBanners = [
+        {
+          _id: 'default-banner',
+          title: 'Mari Salurkan Kebaikan Bersama mukhlasin.or.id',
+          imageUrl: 'https://images.unsplash.com/photo-1532629345422-7515f3d16bb9?q=80&w=1200&auto=format&fit=crop',
+        }
+      ];
+    }
+
+    programsList = data?.programs || [];
 
   } catch (err) {
     console.error('🔥 Gagal mengambil data homepage dari Sanity:', err);
   }
 
+  // Distribusikan program ke masing-masing kategori secara otomatis
+  const mendesakPrograms = programsList.slice(0, 4);
+  const unggulanPrograms = programsList.slice(4, 8);
+  const pilihanPrograms = programsList.slice(0, 6);
+
   return (
     <main className="min-h-screen bg-gray-50 flex flex-col items-center justify-start w-full overflow-x-hidden pb-24">
       <div className="w-full max-w-md mx-auto px-3 py-4 space-y-4">
         
-        {/* Pass data banners dari server component langsung ke Hero */}
         <Hero initialBanners={heroBanners} />
         
         <TotalAccumulationWidget />
         
-        {/* Komponen Campaign dengan props data yang sudah dipisah per section */}
         <Campaign 
           mendesak={mendesakPrograms} 
           unggulan={unggulanPrograms} 
