@@ -1,171 +1,344 @@
-export const dynamic = 'force-dynamic';
+// app/peta-situs/page.tsx
 
-import React from 'react';
-import { Metadata } from 'next';
-import { createClient } from '@sanity/client';
+import type { Metadata } from "next";
+import Link from "next/link";
+import { clientPublik } from "@/lib/sanity";
 
-// 🚀 CONFIG SANITY CLIENT (Murni dari Environment Variables)
-const projectId = process.env.NEXT_SANITY_PROJECT_ID;
-const dataset = process.env.NEXT_SANITY_DATASET || 'production';
+/**
+ * ============================================================
+ * NEXT.JS PAGE CONFIG
+ * ============================================================
+ */
 
-if (!projectId) {
-  throw new Error('🔥 GAGAL: NEXT_SANITY_PROJECT_ID belum disetel di environment variables.');
-}
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
-const sanityClient = createClient({
-  projectId,
-  dataset,
-  apiVersion: '2026-06-20',
-  useCdn: false,
-});
+/**
+ * ============================================================
+ * METADATA SEO
+ * ============================================================
+ */
 
-// ===================================================================
-// META DATA SEO (OPEN GRAPH & METADATA LENGKAP MUKHLASIN)
-// ===================================================================
 export const metadata: Metadata = {
-  title: 'Peta Situs Resmi (Sitemap) | mukhlasin.or.id',
-  description: 'Indeks navigasi lengkap seluruh program donasi, zakat digital, infak kemanusiaan, wakaf, dan kabar berita pembaruan mukhlasin.or.id (Yayasan Darul Mukhlasin Kroya, Cilacap).',
+  title: "Peta Situs Resmi (Sitemap) | mukhlasin.or.id",
+
+  description:
+    "Indeks navigasi lengkap seluruh program donasi, zakat digital, infak kemanusiaan, wakaf, dan kabar berita pembaruan mukhlasin.or.id (Yayasan Darul Mukhlasin Kroya, Cilacap).",
+
   alternates: {
-    canonical: 'https://mukhlasin.or.id/peta-situs',
+    canonical: "https://mukhlasin.or.id/peta-situs",
   },
+
   robots: {
     index: true,
     follow: true,
     nocache: true,
+
     googleBot: {
       index: true,
       follow: true,
-      'max-video-preview': -1,
-      'max-image-preview': 'large',
-      'max-snippet': -1,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
     },
   },
+
   openGraph: {
-    title: 'Peta Situs Resmi (Sitemap) | mukhlasin.or.id',
-    description: 'Akses cepat seluruh struktur halaman program kebaikan dan transparansi laporan mukhlasin.or.id.',
-    url: 'https://mukhlasin.or.id/peta-situs',
-    siteName: 'mukhlasin.or.id',
-    locale: 'id_ID',
-    type: 'website',
+    title: "Peta Situs Resmi (Sitemap) | mukhlasin.or.id",
+
+    description:
+      "Akses cepat seluruh struktur halaman program kebaikan dan transparansi laporan mukhlasin.or.id.",
+
+    url: "https://mukhlasin.or.id/peta-situs",
+    siteName: "mukhlasin.or.id",
+    locale: "id_ID",
+    type: "website",
   },
 };
 
-// Interface Data Fetching
+/**
+ * ============================================================
+ * TYPES
+ * ============================================================
+ */
+
 interface SitemapItem {
   title: string;
   slug: string;
   _createdAt?: string;
 }
 
+interface SitemapData {
+  programs: SitemapItem[];
+  news: SitemapItem[];
+}
+
+/**
+ * ============================================================
+ * STATIC PAGES
+ * ============================================================
+ */
+
+const halamanInti = [
+  {
+    title: "Beranda / Halaman Utama",
+    url: "/",
+  },
+  {
+    title: "Kalkulator Zakat Otomatis",
+    url: "/zakat",
+  },
+  {
+    title: "Portal Fundraiser & Statistik",
+    url: "/fundraiser/stats",
+  },
+  {
+    title: "Tentang Kami & Legalitas",
+    url: "/tentang-kami",
+  },
+  {
+    title: "Hubungi Kami (Layanan Amil)",
+    url: "/kontak",
+  },
+];
+
+/**
+ * ============================================================
+ * SANITY QUERY
+ * ============================================================
+ */
+
+const sitemapQuery = `
+{
+  "programs": *[
+    _type == "program" &&
+    defined(slug.current)
+  ] | order(_createdAt desc) {
+    title,
+    "slug": slug.current,
+    _createdAt
+  },
+
+  "news": *[
+    _type == "news" &&
+    defined(slug.current)
+  ] | order(publishedAt desc) {
+    title,
+    "slug": slug.current,
+    _createdAt
+  }
+}
+`;
+
+/**
+ * ============================================================
+ * PAGE
+ * ============================================================
+ */
+
 export default async function PetaSitusPage() {
   let programs: SitemapItem[] = [];
   let news: SitemapItem[] = [];
 
+  /**
+   * ----------------------------------------------------------
+   * FETCH DATA SANITY
+   * ----------------------------------------------------------
+   *
+   * Menggunakan clientPublik dari lib/sanity.ts.
+   *
+   * Tidak lagi membuat createClient sendiri di halaman ini.
+   * Dengan begitu konfigurasi project ID dan dataset hanya
+   * berada di satu tempat.
+   */
+
   try {
-    // Ambil data agregat langsung dari Sanity secara simultan
-    const query = `{
-      "programs": *[_type == "program"] | order(_createdAt desc) { title, "slug": slug.current },
-      "news": *[_type == "news"] | order(publishedAt desc) { title, "slug": slug.current }
-    }`;
-    
-    const data = await sanityClient.fetch(query);
-    programs = data.programs || [];
-    news = data.news || [];
+    const data = await clientPublik.fetch<SitemapData>(
+      sitemapQuery,
+      {},
+      {
+        cache: "no-store",
+      }
+    );
+
+    programs = Array.isArray(data?.programs)
+      ? data.programs
+      : [];
+
+    news = Array.isArray(data?.news)
+      ? data.news
+      : [];
   } catch (error) {
-    console.error('Gagal memuat data peta situs untuk SEO:', error);
+    /**
+     * Jangan throw error di sini.
+     *
+     * Kalau Sanity sementara bermasalah, halaman tetap dapat
+     * dirender sehingga proses build/deploy tidak ikut gagal.
+     */
+
+    console.error(
+      "[PETA SITUS] Gagal mengambil data Sanity:",
+      error
+    );
   }
 
-  // Struktur Halaman Statis Inti Internal
-  const halamanInti = [
-    { title: 'Beranda / Halaman Utama', url: '/' },
-    { title: 'Kalkulator Zakat Otomatis', url: '/zakat' },
-    { title: 'Portal Fundraiser & Statistik', url: '/fundraiser/stats' },
-    { title: 'Tentang Kami & Legalitas', url: '/tentang-kami' },
-    { title: 'Hubungi Kami (Layanan Amil)', url: '/kontak' },
-  ];
+  /**
+   * ==========================================================
+   * RENDER
+   * ==========================================================
+   */
 
   return (
-    <div className="min-h-screen bg-slate-50 py-4 px-3 pb-28 text-left">
-      {/* 🚀 MODEL MOBILE FIRST: Lebar card mobile konsisten (max-w-md), tanpa sudut lengkung */}
-      <div className="w-full max-w-md mx-auto space-y-4">
-        
-        {/* HEADER SECTION */}
-        <div className="bg-white border border-slate-200 shadow-sm p-4 sm:p-6 space-y-2">
-          <h1 className="text-lg sm:text-xl font-extrabold text-slate-900 tracking-tight">
+    <main className="min-h-screen bg-slate-50 px-3 py-4 pb-28 text-left">
+      <div className="mx-auto w-full max-w-md space-y-4">
+
+        {/* ===================================================
+            HEADER
+        =================================================== */}
+
+        <section className="space-y-2 border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+          <h1 className="text-lg font-extrabold tracking-tight text-slate-900 sm:text-xl">
             🗺️ Peta Situs Resmi (HTML Sitemap)
           </h1>
-          <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-            Halaman ini disediakan untuk mempermudah perayapan indeks robot mesin pencari sekaligus membantu donatur menavigasi seluruh struktur direktori URL <span className="font-semibold text-slate-800">mukhlasin.or.id</span> secara transparan.
-          </p>
-        </div>
 
-        {/* STRUCTURE SITEMAP GRID (Mobile-First 1 Kolom ke Bawah) */}
+          <p className="text-xs leading-relaxed text-slate-600 sm:text-sm">
+            Halaman ini disediakan untuk mempermudah
+            perayapan indeks mesin pencari sekaligus membantu
+            pengunjung menavigasi seluruh struktur direktori URL{" "}
+            <span className="font-semibold text-slate-800">
+              mukhlasin.or.id
+            </span>{" "}
+            secara lebih mudah.
+          </p>
+        </section>
+
+        {/* ===================================================
+            SITEMAP CONTENT
+        =================================================== */}
+
         <div className="space-y-4">
-          
-          {/* KOLOM 1: HALAMAN UTAMA & INTERNAL */}
-          <div className="bg-white border border-slate-200 p-4 sm:p-5 shadow-sm space-y-3">
-            <h2 className="text-xs sm:text-sm font-extrabold text-emerald-800 bg-emerald-50 px-3 py-1.5 uppercase tracking-wider inline-block border border-emerald-100">
+
+          {/* =================================================
+              HALAMAN UTAMA
+          ================================================= */}
+
+          <section className="space-y-3 border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+            <h2 className="inline-block border border-emerald-100 bg-emerald-50 px-3 py-1.5 text-xs font-extrabold uppercase tracking-wider text-emerald-800 sm:text-sm">
               📂 Halaman Utama & Fitur
             </h2>
-            <ul className="space-y-3 text-xs sm:text-sm font-medium text-slate-800">
-              {halamanInti.map((item, idx) => (
-                <li key={idx} className="border-b border-slate-100 pb-2.5 last:border-none">
-                  <a href={item.url} className="hover:text-emerald-700 transition block font-bold leading-snug">
-                    {item.title} <span className="text-[11px] text-slate-400 font-normal block mt-0.5">{`https://mukhlasin.or.id${item.url}`}</span>
-                  </a>
+
+            <ul className="space-y-3 text-xs font-medium text-slate-800 sm:text-sm">
+              {halamanInti.map((item) => (
+                <li
+                  key={item.url}
+                  className="border-b border-slate-100 pb-2.5 last:border-none"
+                >
+                  <Link
+                    href={item.url}
+                    className="block font-bold leading-snug transition hover:text-emerald-700"
+                  >
+                    {item.title}
+
+                    <span className="mt-0.5 block break-all text-[11px] font-normal text-slate-400">
+                      {`https://mukhlasin.or.id${item.url}`}
+                    </span>
+                  </Link>
                 </li>
               ))}
             </ul>
-          </div>
+          </section>
 
-          {/* KOLOM 2: PROGRAM KAMPANYE AKTIF (DYNAMIC SANITY) */}
-          <div className="bg-white border border-slate-200 p-4 sm:p-5 shadow-sm space-y-3">
-            <h2 className="text-xs sm:text-sm font-extrabold text-emerald-800 bg-emerald-50 px-3 py-1.5 uppercase tracking-wider inline-block border border-emerald-100">
+          {/* =================================================
+              PROGRAM / CAMPAIGN
+          ================================================= */}
+
+          <section className="space-y-3 border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+            <h2 className="inline-block border border-emerald-100 bg-emerald-50 px-3 py-1.5 text-xs font-extrabold uppercase tracking-wider text-emerald-800 sm:text-sm">
               📦 Program Kebaikan ({programs.length})
             </h2>
+
             {programs.length > 0 ? (
-              <ul className="space-y-3 text-xs sm:text-sm font-medium text-slate-800 max-h-[400px] overflow-y-auto pr-1">
-                {programs.map((item, idx) => (
-                  <li key={idx} className="border-b border-slate-100 pb-2.5 last:border-none">
-                    <a href={`/campaign/${item.slug}`} className="hover:text-emerald-700 transition block font-bold leading-snug">
-                      {item.title} <span className="text-[11px] text-slate-400 font-normal block mt-0.5">{`https://mukhlasin.or.id/campaign/${item.slug}`}</span>
-                    </a>
-                  </li>
-                ))}
+              <ul className="max-h-[400px] space-y-3 overflow-y-auto pr-1 text-xs font-medium text-slate-800 sm:text-sm">
+                {programs.map((item) => {
+                  const url = `/campaign/${item.slug}`;
+
+                  return (
+                    <li
+                      key={item.slug}
+                      className="border-b border-slate-100 pb-2.5 last:border-none"
+                    >
+                      <Link
+                        href={url}
+                        className="block font-bold leading-snug transition hover:text-emerald-700"
+                      >
+                        {item.title}
+
+                        <span className="mt-0.5 block break-all text-[11px] font-normal text-slate-400">
+                          {`https://mukhlasin.or.id${url}`}
+                        </span>
+                      </Link>
+                    </li>
+                  );
+                })}
               </ul>
             ) : (
-              <p className="text-xs text-slate-400 italic">Belum ada program kampanye aktif.</p>
+              <p className="text-xs italic text-slate-400">
+                Belum ada program kampanye aktif.
+              </p>
             )}
-          </div>
+          </section>
 
-          {/* KOLOM 3: BERITA KEMANUSIAAN (DYNAMIC SANITY) */}
-          <div className="bg-white border border-slate-200 p-4 sm:p-5 shadow-sm space-y-3">
-            <h2 className="text-xs sm:text-sm font-extrabold text-emerald-800 bg-emerald-50 px-3 py-1.5 uppercase tracking-wider inline-block border border-emerald-100">
+          {/* =================================================
+              NEWS
+          ================================================= */}
+
+          <section className="space-y-3 border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+            <h2 className="inline-block border border-emerald-100 bg-emerald-50 px-3 py-1.5 text-xs font-extrabold uppercase tracking-wider text-emerald-800 sm:text-sm">
               📰 Berita & Kabar ({news.length})
             </h2>
+
             {news.length > 0 ? (
-              <ul className="space-y-3 text-xs sm:text-sm font-medium text-slate-800 max-h-[400px] overflow-y-auto pr-1">
-                {news.map((item, idx) => (
-                  <li key={idx} className="border-b border-slate-100 pb-2.5 last:border-none">
-                    <a href={`/news/${item.slug}`} className="hover:text-emerald-700 transition block font-bold leading-snug">
-                      {item.title} <span className="text-[11px] text-slate-400 font-normal block mt-0.5">{`https://mukhlasin.or.id/news/${item.slug}`}</span>
-                    </a>
-                  </li>
-                ))}
+              <ul className="max-h-[400px] space-y-3 overflow-y-auto pr-1 text-xs font-medium text-slate-800 sm:text-sm">
+                {news.map((item) => {
+                  const url = `/news/${item.slug}`;
+
+                  return (
+                    <li
+                      key={item.slug}
+                      className="border-b border-slate-100 pb-2.5 last:border-none"
+                    >
+                      <Link
+                        href={url}
+                        className="block font-bold leading-snug transition hover:text-emerald-700"
+                      >
+                        {item.title}
+
+                        <span className="mt-0.5 block break-all text-[11px] font-normal text-slate-400">
+                          {`https://mukhlasin.or.id${url}`}
+                        </span>
+                      </Link>
+                    </li>
+                  );
+                })}
               </ul>
             ) : (
-              <p className="text-xs text-slate-400 italic">Belum ada artikel berita diterbitkan.</p>
+              <p className="text-xs italic text-slate-400">
+                Belum ada artikel berita diterbitkan.
+              </p>
             )}
-          </div>
-
+          </section>
         </div>
 
-        {/* FOOTER METRICS INFO */}
-        <div className="text-center text-xs text-slate-400 font-medium tracking-wide pt-2">
-          © {new Date().getFullYear()} mukhlasin.or.id. Nilai tautan peta situs dipetakan otomatis terintegrasi skema indeks.
-        </div>
+        {/* ===================================================
+            FOOTER
+        =================================================== */}
 
+        <footer className="pt-2 text-center text-xs font-medium tracking-wide text-slate-400">
+          © {new Date().getFullYear()} mukhlasin.or.id. Peta
+          situs diperbarui secara otomatis berdasarkan konten
+          yang diterbitkan.
+        </footer>
       </div>
-    </div>
+    </main>
   );
 }
