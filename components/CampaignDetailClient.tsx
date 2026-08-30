@@ -430,35 +430,12 @@ export default function CampaignDetailClient({ slug, referral }: CampaignDetailC
       return;
     }
 
-    /**
-     * Slug project Pakasir boleh tersedia di browser karena memang menjadi
-     * bagian URL pembayaran. API key Pakasir TIDAK BOLEH memakai NEXT_PUBLIC_.
-     *
-     * PENTING:
-     * Tidak ada lagi fallback "balai-dakwah-banjarnegara".
-     * Jika env belum disetel, proses dihentikan agar tidak salah project.
-     */
-    const projectSlug =
-      process.env.NEXT_PUBLIC_PAKASIR_PROJECT_SLUG?.trim();
-
-    if (!projectSlug) {
-      console.error(
-        '[CHECKOUT] NEXT_PUBLIC_PAKASIR_PROJECT_SLUG belum disetel.'
-      );
-      alert(
-        'Konfigurasi project pembayaran belum tersedia. Silakan hubungi administrator.'
-      );
-      return;
-    }
-
     setSubmitting(true);
 
     try {
-      /**
-       * Buat order internal terlebih dahulu.
-       * /api/checkout bertanggung jawab membuat order_id dan menyimpan
-       * data transaksi awal di server.
-       */
+      // Semua proses Pakasir dilakukan oleh server melalui /api/checkout.
+      // Frontend tidak menyimpan konfigurasi project Pakasir
+      // dan tidak merakit URL pembayaran sendiri.
       const res = await fetch('/api/checkout', {
         method: 'POST',
         headers: {
@@ -471,7 +448,7 @@ export default function CampaignDetailClient({ slug, referral }: CampaignDetailC
           donorPhone: cleanPhone,
           amount: cleanAmount,
           paymentMethod,
-          fundraiserPhone: referral,
+          fundraiserPhone: referral || '',
         }),
       });
 
@@ -480,7 +457,7 @@ export default function CampaignDetailClient({ slug, referral }: CampaignDetailC
       try {
         json = await res.json();
       } catch {
-        throw new Error('Respons checkout dari server tidak valid.');
+        throw new Error('Respons server checkout tidak valid.');
       }
 
       if (!res.ok) {
@@ -491,59 +468,59 @@ export default function CampaignDetailClient({ slug, referral }: CampaignDetailC
         );
       }
 
-      if (!json?.success || !json?.orderId) {
+      if (!json?.success) {
         throw new Error(
           json?.error ||
             json?.message ||
-            'Order ID transaksi tidak berhasil dibuat.'
+            'Gagal membuat transaksi pembayaran.'
         );
       }
 
-      const orderId = String(json.orderId).trim();
-
-      if (!orderId) {
-        throw new Error('Order ID transaksi kosong.');
+      if (!json?.orderId) {
+        throw new Error(
+          'Order ID transaksi tidak diterima dari server.'
+        );
       }
 
-      /**
-       * Pakasir URL Integration:
-       * https://app.pakasir.com/pay/{slug}/{amount}?order_id={order_id}
-       */
-      const siteUrl = window.location.origin;
-
-      const returnUrl =
-        `${siteUrl}/thank-you?order_id=${encodeURIComponent(orderId)}`;
-
-      const params = new URLSearchParams({
-        order_id: orderId,
-        redirect: returnUrl,
-      });
-
-      /**
-       * Jika QRIS dipilih, Pakasir langsung menampilkan QRIS.
-       * Untuk VA, halaman Pakasir tetap dibuka dengan metode yang tersedia.
-       *
-       * Catatan:
-       * Integrasi URL resmi Pakasir hanya menyediakan opsi qris_only.
-       * paymentMethod tetap dikirim ke /api/checkout untuk pencatatan internal.
-       */
-      if (paymentMethod === 'qris') {
-        params.set('qris_only', '1');
+      if (!json?.paymentUrl || typeof json.paymentUrl !== 'string') {
+        throw new Error(
+          'URL pembayaran tidak diterima dari server.'
+        );
       }
 
-      const pakasirPayUrl =
-        `https://app.pakasir.com/pay/` +
-        `${encodeURIComponent(projectSlug)}/` +
-        `${cleanAmount}?${params.toString()}`;
+      let paymentUrl: URL;
 
-      window.location.assign(pakasirPayUrl);
+      try {
+        paymentUrl = new URL(json.paymentUrl);
+      } catch {
+        throw new Error(
+          'URL pembayaran yang diterima dari server tidak valid.'
+        );
+      }
+
+      // Pengamanan redirect: hanya izinkan halaman pembayaran resmi Pakasir.
+      if (
+        paymentUrl.protocol !== 'https:' ||
+        paymentUrl.hostname !== 'app.pakasir.com'
+      ) {
+        console.error(
+          '[CHECKOUT] Payment URL tidak valid:',
+          json.paymentUrl
+        );
+
+        throw new Error(
+          'URL pembayaran tidak valid.'
+        );
+      }
+
+      window.location.assign(paymentUrl.toString());
     } catch (err: unknown) {
       console.error('[CHECKOUT] Gagal memproses transaksi:', err);
 
       const message =
         err instanceof Error
           ? err.message
-          : 'Terjadi kesalahan koneksi saat memproses transaksi.';
+          : 'Terjadi kesalahan saat memproses pembayaran.';
 
       alert(message);
       setSubmitting(false);
