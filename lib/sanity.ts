@@ -11,7 +11,7 @@ import {
  * KONFIGURASI SANITY
  * ============================================================
  *
- * NEXT_PUBLIC_* aman digunakan di browser.
+ * NEXT_PUBLIC_* boleh digunakan di browser.
  * SANITY_API_TOKEN hanya boleh digunakan di server.
  */
 
@@ -32,13 +32,13 @@ const apiVersion = "2026-07-18";
  * CLIENT PUBLIK
  * ============================================================
  *
- * Digunakan untuk:
- * - mengambil campaign
- * - mengambil artikel
- * - mengambil gambar
- * - query data publik
+ * Digunakan untuk membaca data publik:
+ * - Campaign
+ * - Artikel
+ * - Program
+ * - Gambar
  *
- * Tidak menggunakan token.
+ * Client ini tidak menggunakan token.
  */
 
 export const clientPublik = createClient({
@@ -51,43 +51,45 @@ export const clientPublik = createClient({
 
 /**
  * ============================================================
- * CLIENT INTERNAL
+ * CLIENT INTERNAL / WRITE
  * ============================================================
  *
- * HANYA gunakan clientInternal di:
- *
- * - app/api/**/route.ts
+ * Digunakan hanya pada sisi server, misalnya:
+ * - API Route Next.js
  * - Server Action
- * - server component
- * - webhook
+ * - Server Component
+ * - Webhook
  *
- * JANGAN digunakan di component dengan "use client".
+ * Jangan gunakan clientInternal pada file dengan:
  *
- * Token tidak menggunakan NEXT_PUBLIC_ agar tidak terekspos
- * ke browser.
+ * "use client"
+ *
+ * Token write tidak boleh menggunakan prefix NEXT_PUBLIC_.
  */
+
+const sanityWriteToken =
+  process.env.SANITY_API_TOKEN ||
+  process.env.SANITY_API_WRITE_TOKEN;
 
 export const clientInternal = createClient({
   projectId,
   dataset,
   apiVersion,
   useCdn: false,
-
-  token:
-    process.env.SANITY_API_TOKEN ||
-    process.env.SANITY_API_WRITE_TOKEN,
+  token: sanityWriteToken,
+  perspective: "published",
 });
 
 /**
  * ============================================================
- * SANITY IMAGE BUILDER
+ * IMAGE URL BUILDER
  * ============================================================
  */
 
 const builder = createImageUrlBuilder(clientPublik);
 
 /**
- * Generate URL gambar Sanity.
+ * Membuat URL gambar dari asset Sanity.
  *
  * Contoh:
  *
@@ -95,7 +97,7 @@ const builder = createImageUrlBuilder(clientPublik);
  *   .width(1200)
  *   .height(675)
  *   .quality(90)
- *   .url()
+ *   .url();
  */
 
 export function urlFor(source: SanityImageSource) {
@@ -103,12 +105,15 @@ export function urlFor(source: SanityImageSource) {
 }
 
 /**
- * Default export tetap dipertahankan agar file-file lama
- * yang menggunakan:
+ * ============================================================
+ * DEFAULT EXPORT
+ * ============================================================
  *
- * import client from "@/lib/sanity"
+ * Dipertahankan agar kode lama seperti:
  *
- * tidak error.
+ * import client from "@/lib/sanity";
+ *
+ * tetap berjalan.
  */
 
 export default clientPublik;
