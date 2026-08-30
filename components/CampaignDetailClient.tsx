@@ -171,7 +171,9 @@ const DonationFormFields = ({
   const PRESET_AMOUNTS = [10000, 15000, 25000, 50000, 100000, 250000];
   const cleanAmountNum = Number(String(amount || '').replace(/[^0-9]/g, '')) || 0;
 
-  const hasPhone = Boolean(profile?.phone && profile.phone.trim().length >= 9);
+  const hasPhone = Boolean(
+    profile?.phone && String(profile.phone).replace(/[^0-9]/g, '').length >= 9
+  );
 
   return (
     <div className="space-y-4 text-left">
@@ -223,8 +225,13 @@ const DonationFormFields = ({
           <option value="qris">QRIS (Semua E-Wallet / Mobile Banking)</option>
           <option value="bni_va">Virtual Account BNI</option>
           <option value="bri_va">Virtual Account BRI</option>
-          <option value="mandiri_va">Virtual Account Mandiri</option>
           <option value="permata_va">Virtual Account Permata</option>
+          <option value="cimb_niaga_va">Virtual Account CIMB Niaga</option>
+          <option value="maybank_va">Virtual Account Maybank</option>
+          <option value="bnc_va">Virtual Account BNC</option>
+          <option value="atm_bersama_va">Virtual Account ATM Bersama</option>
+          <option value="artha_graha_va">Virtual Account Artha Graha</option>
+          <option value="sampoerna_va">Virtual Account Sampoerna</option>
         </select>
       </div>
 
@@ -406,55 +413,139 @@ export default function CampaignDetailClient({ slug, referral }: CampaignDetailC
   };
 
   const handleDonate = async () => {
-    const cleanAmount = Number(String(amount || '').replace(/[^0-9]/g, ''));
-    if (!cleanAmount || isNaN(cleanAmount) || cleanAmount < 1000) {
+    const cleanAmount = Number(
+      String(amount || '').replace(/[^0-9]/g, '')
+    );
+
+    if (!cleanAmount || Number.isNaN(cleanAmount) || cleanAmount < 1000) {
       alert('Masukkan nominal minimal Rp 1.000!');
       return;
     }
 
     const activePhone = profile?.phone || inlinePhone;
     const cleanPhone = String(activePhone || '').replace(/[^0-9]/g, '');
+
     if (!cleanPhone || cleanPhone.length < 9) {
       alert('Nomor WhatsApp wajib diisi!');
       return;
     }
 
+    /**
+     * Slug project Pakasir boleh tersedia di browser karena memang menjadi
+     * bagian URL pembayaran. API key Pakasir TIDAK BOLEH memakai NEXT_PUBLIC_.
+     *
+     * PENTING:
+     * Tidak ada lagi fallback "balai-dakwah-banjarnegara".
+     * Jika env belum disetel, proses dihentikan agar tidak salah project.
+     */
+    const projectSlug =
+      process.env.NEXT_PUBLIC_PAKASIR_PROJECT_SLUG?.trim();
+
+    if (!projectSlug) {
+      console.error(
+        '[CHECKOUT] NEXT_PUBLIC_PAKASIR_PROJECT_SLUG belum disetel.'
+      );
+      alert(
+        'Konfigurasi project pembayaran belum tersedia. Silakan hubungi administrator.'
+      );
+      return;
+    }
+
     setSubmitting(true);
+
     try {
+      /**
+       * Buat order internal terlebih dahulu.
+       * /api/checkout bertanggung jawab membuat order_id dan menyimpan
+       * data transaksi awal di server.
+       */
       const res = await fetch('/api/checkout', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        cache: 'no-store',
         body: JSON.stringify({
           slug: program?.slug || slug,
           donorName: profile?.name?.trim() || 'Hamba Allah',
           donorPhone: cleanPhone,
           amount: cleanAmount,
-          paymentMethod: paymentMethod, 
+          paymentMethod,
           fundraiserPhone: referral,
         }),
       });
 
-      const json = await res.json();
-      
-      if (json.success && json.orderId) {
-        const projectSlug = process.env.NEXT_PUBLIC_PAKASIR_PROJECT_SLUG || 'balai-dakwah-banjarnegara';
-        const siteUrl = window.location.origin; 
-        const returnUrl = `${siteUrl}/thank-you?order_id=${json.orderId}`;
+      let json: any = null;
 
-        let pakasirPayUrl = `https://app.pakasir.com/pay/${projectSlug}/${cleanAmount}?order_id=${json.orderId}&redirect=${encodeURIComponent(returnUrl)}`;
-        
-        if (paymentMethod === 'qris') {
-          pakasirPayUrl += `&qris_only=1`;
-        }
-
-        window.location.href = pakasirPayUrl;
-      } else {
-        alert(json.error || 'Gagal memproses transaksi.');
-        setSubmitting(false);
+      try {
+        json = await res.json();
+      } catch {
+        throw new Error('Respons checkout dari server tidak valid.');
       }
-    } catch (err) {
-      console.error(err);
-      alert('Terjadi kesalahan koneksi.');
+
+      if (!res.ok) {
+        throw new Error(
+          json?.error ||
+            json?.message ||
+            `Checkout gagal dengan HTTP ${res.status}.`
+        );
+      }
+
+      if (!json?.success || !json?.orderId) {
+        throw new Error(
+          json?.error ||
+            json?.message ||
+            'Order ID transaksi tidak berhasil dibuat.'
+        );
+      }
+
+      const orderId = String(json.orderId).trim();
+
+      if (!orderId) {
+        throw new Error('Order ID transaksi kosong.');
+      }
+
+      /**
+       * Pakasir URL Integration:
+       * https://app.pakasir.com/pay/{slug}/{amount}?order_id={order_id}
+       */
+      const siteUrl = window.location.origin;
+
+      const returnUrl =
+        `${siteUrl}/thank-you?order_id=${encodeURIComponent(orderId)}`;
+
+      const params = new URLSearchParams({
+        order_id: orderId,
+        redirect: returnUrl,
+      });
+
+      /**
+       * Jika QRIS dipilih, Pakasir langsung menampilkan QRIS.
+       * Untuk VA, halaman Pakasir tetap dibuka dengan metode yang tersedia.
+       *
+       * Catatan:
+       * Integrasi URL resmi Pakasir hanya menyediakan opsi qris_only.
+       * paymentMethod tetap dikirim ke /api/checkout untuk pencatatan internal.
+       */
+      if (paymentMethod === 'qris') {
+        params.set('qris_only', '1');
+      }
+
+      const pakasirPayUrl =
+        `https://app.pakasir.com/pay/` +
+        `${encodeURIComponent(projectSlug)}/` +
+        `${cleanAmount}?${params.toString()}`;
+
+      window.location.assign(pakasirPayUrl);
+    } catch (err: unknown) {
+      console.error('[CHECKOUT] Gagal memproses transaksi:', err);
+
+      const message =
+        err instanceof Error
+          ? err.message
+          : 'Terjadi kesalahan koneksi saat memproses transaksi.';
+
+      alert(message);
       setSubmitting(false);
     }
   };
