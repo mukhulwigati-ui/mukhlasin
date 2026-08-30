@@ -4,13 +4,13 @@ import { createClient } from '@sanity/client';
 
 export const dynamic = 'force-dynamic';
 
-// 🚀 INITIALIZE SANITY CLIENT (ID Proyek: ks29gg6v)
+// 🚀 INITIALIZE SANITY CLIENT (ID Proyek: a45erd4y)
 const client = createClient({
-  projectId: 'ks29gg6v', 
+  projectId: 'a45erd4y', 
   dataset: 'production',
   useCdn: false,
   apiVersion: '2026-07-18',
-  token: process.env.SANITY_API_WRITE_TOKEN || 'skTkgR8oTccSIXr6lsYEhhShtcblvWtNod41Oq1DSARiIqwBqTEpWqaaO3AFWwLKCch2Z0SviYoIOftVnn6S37ypRTvvCPmHtC9fELz2EbMnlh0Vt70al8UZZHWE6y8VvsqRA2GUYo7uhz9WhdFWkG4BPwTbwotrE3KfB3MZthvBbIo6QxrK', 
+  token: process.env.SANITY_API_WRITE_TOKEN || 'skD0c9tq5mQZRkunY41DwfSBmnCOXDtCiWUoOaRGrxH6M67Suo0q0vYyeFnjDa0RoDF4aaoMXQWCXSkSYVI60sSeYZsm2Bz9qGD2r3oe3VU72y5rAzt56F2oznhTZlHAXZbInKeL4zFY799KmDwVUvPMrRiZSWJ21uZeUEvvpR5sGE5U7U0A', 
 });
 
 export async function POST(request: Request) {

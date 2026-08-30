@@ -10,7 +10,7 @@ const client = createClient({
   dataset: process.env.NEXT_SANITY_DATASET || process.env.NEXT_PUBLIC_SANITY_DATASET || 'production',
   useCdn: false,
   apiVersion: '2026-07-18',
-  token: process.env.SANITY_API_WRITE_TOKEN || 'skTkgR8oTccSIXr6lsYEhhShtcblvWtNod41Oq1DSARiIqwBqTEpWqaaO3AFWwLKCch2Z0SviYoIOftVnn6S37ypRTvvCPmHtC9fELz2EbMnlh0Vt70al8UZZHWE6y8VvsqRA2GUYo7uhz9WhdFWkG4BPwTbwotrE3KfB3MZthvBbIo6QxrK',
+  token: process.env.SANITY_API_WRITE_TOKEN || 'skD0c9tq5mQZRkunY41DwfSBmnCOXDtCiWUoOaRGrxH6M67Suo0q0vYyeFnjDa0RoDF4aaoMXQWCXSkSYVI60sSeYZsm2Bz9qGD2r3oe3VU72y5rAzt56F2oznhTZlHAXZbInKeL4zFY799KmDwVUvPMrRiZSWJ21uZeUEvvpR5sGE5U7U0A',
 });
 
 // Fungsi helper untuk kirim WhatsApp via Fonnte
