@@ -6,30 +6,36 @@ import { createClient } from '@sanity/client';
 export const dynamic = 'force-dynamic';
 
 // ============================================================================
-// HELPER: SANITY CLIENT
+// SANITY CLIENT
 // ============================================================================
 
 function getSanityClient() {
   const projectId =
     process.env.NEXT_SANITY_PROJECT_ID ||
-    process.env.NEXT_PUBLIC_SANITY_PROJECT_ID;
+    process.env.NEXT_PUBLIC_SANITY_PROJECT_ID ||
+    'a45erd4y';
 
   const dataset =
     process.env.NEXT_SANITY_DATASET ||
     process.env.NEXT_PUBLIC_SANITY_DATASET ||
     'production';
 
-  const token = process.env.SANITY_API_WRITE_TOKEN;
+  // ==========================================================
+  // SESUAI ENVIRONMENT VARIABLE VERCEL ANDA
+  // ==========================================================
+  const token =
+    process.env.SANITY_API_TOKEN ||
+    process.env.SANITY_API_WRITE_TOKEN;
 
   if (!projectId) {
     throw new Error(
-      'NEXT_SANITY_PROJECT_ID / NEXT_PUBLIC_SANITY_PROJECT_ID belum diatur.'
+      'Sanity Project ID belum diatur di Environment Variables.'
     );
   }
 
   if (!token) {
     throw new Error(
-      'SANITY_API_WRITE_TOKEN belum diatur di Environment Variables.'
+      'SANITY_API_TOKEN belum diatur di Environment Variables.'
     );
   }
 
@@ -43,18 +49,23 @@ function getSanityClient() {
 }
 
 // ============================================================================
-// HELPER: FORMAT NOMOR WHATSAPP
+// FORMAT NOMOR WHATSAPP
 // ============================================================================
 
 function formatPhoneNumber(phone: string): string {
   let formatted = String(phone || '').replace(/\D/g, '');
 
-  // 08xxxx -> 628xxxx
+  // +62xxxxxxxx -> 62xxxxxxxx
+  if (formatted.startsWith('620')) {
+    formatted = `62${formatted.slice(3)}`;
+  }
+
+  // 08xxxxxxxx -> 628xxxxxxxx
   if (formatted.startsWith('0')) {
     formatted = `62${formatted.slice(1)}`;
   }
 
-  // 8xxxx -> 628xxxx
+  // 8xxxxxxxx -> 628xxxxxxxx
   if (formatted.startsWith('8')) {
     formatted = `62${formatted}`;
   }
@@ -63,11 +74,11 @@ function formatPhoneNumber(phone: string): string {
 }
 
 // ============================================================================
-// HELPER: AMBIL SLUG / ID PROGRAM
+// AMBIL IDENTIFIER PROGRAM
 // ============================================================================
 
 function getProgramIdentifier(transaction: any): string | null {
-  // programSlug berupa string
+  // programSlug string
   if (
     typeof transaction?.programSlug === 'string' &&
     transaction.programSlug.trim()
@@ -75,7 +86,7 @@ function getProgramIdentifier(transaction: any): string | null {
     return transaction.programSlug.trim();
   }
 
-  // programSlug berupa object Sanity slug
+  // programSlug object Sanity
   if (
     transaction?.programSlug?.current &&
     typeof transaction.programSlug.current === 'string'
@@ -83,7 +94,7 @@ function getProgramIdentifier(transaction: any): string | null {
     return transaction.programSlug.current;
   }
 
-  // slug berupa string
+  // slug string
   if (
     typeof transaction?.slug === 'string' &&
     transaction.slug.trim()
@@ -91,7 +102,7 @@ function getProgramIdentifier(transaction: any): string | null {
     return transaction.slug.trim();
   }
 
-  // slug berupa object Sanity
+  // slug object Sanity
   if (
     transaction?.slug?.current &&
     typeof transaction.slug.current === 'string'
@@ -99,7 +110,7 @@ function getProgramIdentifier(transaction: any): string | null {
     return transaction.slug.current;
   }
 
-  // reference ke dokumen program
+  // program berupa reference Sanity
   if (
     transaction?.program?._ref &&
     typeof transaction.program._ref === 'string'
@@ -107,11 +118,26 @@ function getProgramIdentifier(transaction: any): string | null {
     return transaction.program._ref;
   }
 
+  // campaignSlug jika project lama memakai nama ini
+  if (
+    typeof transaction?.campaignSlug === 'string' &&
+    transaction.campaignSlug.trim()
+  ) {
+    return transaction.campaignSlug.trim();
+  }
+
+  if (
+    transaction?.campaignSlug?.current &&
+    typeof transaction.campaignSlug.current === 'string'
+  ) {
+    return transaction.campaignSlug.current;
+  }
+
   return null;
 }
 
 // ============================================================================
-// HELPER: KIRIM WHATSAPP VIA FONNTE
+// KIRIM NOTIFIKASI WHATSAPP VIA FONNTE
 // ============================================================================
 
 async function sendFonnteNotification(
@@ -120,23 +146,27 @@ async function sendFonnteNotification(
   amount: number,
   programTitle: string,
   orderId: string
-) {
-  // PENTING:
-  // Menggunakan FONNTE_TOKEN sesuai Environment Variable di Vercel.
-  // Tidak ada lagi token hardcode.
+): Promise<boolean> {
+  // ==========================================================
+  // SESUAI ENVIRONMENT VARIABLE VERCEL ANDA
+  // ==========================================================
   const fonnteToken = process.env.FONNTE_TOKEN;
 
   if (!fonnteToken) {
     console.error(
       '[Fonnte Error] FONNTE_TOKEN belum diatur di Environment Variables.'
     );
+
     return false;
   }
 
   const formattedPhone = formatPhoneNumber(targetPhone);
 
   if (!formattedPhone) {
-    console.warn('[Fonnte Warning] Nomor WhatsApp kosong.');
+    console.warn(
+      `[Fonnte Warning] Nomor WhatsApp kosong untuk transaksi ${orderId}.`
+    );
+
     return false;
   }
 
@@ -144,18 +174,17 @@ async function sendFonnteNotification(
     console.warn(
       `[Fonnte Warning] Nomor WhatsApp tidak valid: ${formattedPhone}`
     );
+
     return false;
   }
 
   const safeDonorName =
-    donorName && donorName.trim()
-      ? donorName.trim()
-      : 'Hamba Allah';
+    String(donorName || '').trim() ||
+    'Hamba Allah';
 
   const safeProgramTitle =
-    programTitle && programTitle.trim()
-      ? programTitle.trim()
-      : 'Program Kebaikan';
+    String(programTitle || '').trim() ||
+    'Program Kebaikan';
 
   const safeAmount =
     Number.isFinite(Number(amount))
@@ -163,7 +192,7 @@ async function sendFonnteNotification(
       : 0;
 
   // ==========================================================================
-  // PESAN WHATSAPP MUKHLASIN
+  // PESAN WHATSAPP
   // ==========================================================================
 
   const message =
@@ -179,29 +208,32 @@ async function sendFonnteNotification(
 
   try {
     console.log(
-      `[Fonnte] Mengirim notifikasi transaksi ${orderId} ke ${formattedPhone}`
+      `[Fonnte] Mengirim WA transaksi ${orderId} ke ${formattedPhone}`
     );
 
-    const response = await fetch('https://api.fonnte.com/send', {
-      method: 'POST',
+    const response = await fetch(
+      'https://api.fonnte.com/send',
+      {
+        method: 'POST',
 
-      headers: {
-        Authorization: fonnteToken,
-        'Content-Type': 'application/json',
-      },
+        headers: {
+          Authorization: fonnteToken,
+          'Content-Type': 'application/json',
+        },
 
-      body: JSON.stringify({
-        target: formattedPhone,
-        message,
-        countryCode: '62',
-      }),
+        body: JSON.stringify({
+          target: formattedPhone,
+          message,
+          countryCode: '62',
+        }),
 
-      cache: 'no-store',
-    });
+        cache: 'no-store',
+      }
+    );
 
     const responseText = await response.text();
 
-    let result: any;
+    let result: any = null;
 
     try {
       result = JSON.parse(responseText);
@@ -212,32 +244,37 @@ async function sendFonnteNotification(
       };
     }
 
+    console.log(
+      '[Fonnte Response]',
+      result
+    );
+
     if (!response.ok) {
       console.error(
-        `[Fonnte Error] HTTP ${response.status}:`,
+        `[Fonnte Error] HTTP ${response.status}`,
         result
       );
 
       return false;
     }
 
-    if (result?.status) {
+    if (result?.status === true) {
       console.log(
-        `[Fonnte Success] WhatsApp transaksi ${orderId} berhasil dikirim.`
+        `[Fonnte Success] WA transaksi ${orderId} berhasil dikirim.`
       );
 
       return true;
     }
 
     console.error(
-      '[Fonnte Error] Pengiriman WhatsApp gagal:',
+      '[Fonnte Error] Pengiriman WA gagal:',
       result
     );
 
     return false;
   } catch (error) {
     console.error(
-      '[Fonnte Exception] Terjadi error saat mengirim WhatsApp:',
+      '[Fonnte Exception]',
       error
     );
 
@@ -252,7 +289,7 @@ async function sendFonnteNotification(
 export async function POST(request: Request) {
   try {
     // =========================================================================
-    // 1. BACA PAYLOAD PAKASIR
+    // 1. BACA PAYLOAD
     // =========================================================================
 
     const body = await request.json();
@@ -265,12 +302,14 @@ export async function POST(request: Request) {
       completed_at,
     } = body;
 
-    const orderId = String(order_id || '').trim();
-    const paymentStatus = String(status || '')
-      .trim()
-      .toLowerCase();
+    const orderId =
+      String(order_id || '').trim();
 
-    // Jangan log seluruh body karena dapat berisi data pribadi donatur.
+    const paymentStatus =
+      String(status || '')
+        .trim()
+        .toLowerCase();
+
     console.log(
       `[Pakasir Webhook] Order: ${orderId || '-'} | Status: ${
         paymentStatus || '-'
@@ -278,18 +317,34 @@ export async function POST(request: Request) {
     );
 
     // =========================================================================
-    // VALIDASI PAYLOAD
+    // VALIDASI
     // =========================================================================
 
-    if (!orderId || !paymentStatus) {
+    if (!orderId) {
       console.warn(
-        '[Pakasir Webhook] Payload tidak memiliki order_id atau status.'
+        '[Pakasir Webhook] order_id tidak ditemukan.'
       );
 
       return NextResponse.json(
         {
           success: false,
-          error: 'Invalid webhook payload',
+          error: 'order_id tidak ditemukan',
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    if (!paymentStatus) {
+      console.warn(
+        '[Pakasir Webhook] status tidak ditemukan.'
+      );
+
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'status tidak ditemukan',
         },
         {
           status: 400,
@@ -298,21 +353,21 @@ export async function POST(request: Request) {
     }
 
     // =========================================================================
-    // HANYA PROSES TRANSAKSI SUKSES
+    // HANYA PROSES STATUS SUKSES
     // =========================================================================
 
-    const isSuccess =
+    const isPaymentSuccess =
       paymentStatus === 'completed' ||
       paymentStatus === 'success';
 
-    if (!isSuccess) {
+    if (!isPaymentSuccess) {
       console.log(
-        `[Pakasir Webhook] Status ${paymentStatus}. Tidak ada proses transaksi sukses.`
+        `[Pakasir Webhook] Status "${paymentStatus}" belum sukses.`
       );
 
       return NextResponse.json({
         success: true,
-        message: `Webhook received with status: ${paymentStatus}`,
+        message: `Webhook diterima dengan status ${paymentStatus}`,
       });
     }
 
@@ -323,7 +378,7 @@ export async function POST(request: Request) {
     const client = getSanityClient();
 
     // =========================================================================
-    // 3. CARI TRANSAKSI BERDASARKAN ORDER ID
+    // 3. CARI TRANSAKSI
     // =========================================================================
 
     const transactionQuery = `
@@ -333,37 +388,51 @@ export async function POST(request: Request) {
       ][0]
     `;
 
-    const transaction = await client.fetch(
-      transactionQuery,
-      {
-        orderId,
-      }
-    );
+    const transaction =
+      await client.fetch(
+        transactionQuery,
+        {
+          orderId,
+        }
+      );
 
     // =========================================================================
     // DATA DEFAULT
     // =========================================================================
 
-    let programTitle = 'Program Kebaikan';
-    let donorPhone = '';
     let donorName = 'Hamba Allah';
-    let donationAmount = Number(amount || 0);
+
+    let donorPhone = '';
+
+    let donationAmount =
+      Number(amount || 0);
+
+    let programTitle =
+      'Program Kebaikan';
+
+    let programDoc: any = null;
+
+    let programIdentifier: string | null = null;
 
     // =========================================================================
-    // TRANSAKSI DITEMUKAN
+    // 4. JIKA TRANSAKSI DITEMUKAN
     // =========================================================================
 
     if (transaction) {
-      donorPhone =
-        transaction.donorPhone ||
-        transaction.phone ||
-        transaction.whatsapp ||
-        '';
+      console.log(
+        `[Sanity] Transaksi ditemukan: ${transaction._id}`
+      );
 
       donorName =
         transaction.donorName ||
         transaction.name ||
         'Hamba Allah';
+
+      donorPhone =
+        transaction.donorPhone ||
+        transaction.phone ||
+        transaction.whatsapp ||
+        '';
 
       donationAmount = Number(
         transaction.amount ||
@@ -371,33 +440,18 @@ export async function POST(request: Request) {
         0
       );
 
-      // =======================================================================
-      // CEGAH WEBHOOK GANDA
-      // =======================================================================
-
-      const previousStatus = String(
-        transaction.status || ''
-      ).toLowerCase();
-
-      if (previousStatus === 'success') {
-        console.log(
-          `[Pakasir Webhook] Transaksi ${orderId} sebelumnya sudah SUCCESS. ` +
-            `Webhook duplikat diabaikan agar nominal donasi tidak bertambah dua kali.`
-        );
-
-        return NextResponse.json({
-          success: true,
-          duplicate: true,
-          message: 'Transaction already processed',
-        });
-      }
-
-      // =======================================================================
-      // 4. AMBIL PROGRAM
-      // =======================================================================
-
-      const programIdentifier =
+      programIdentifier =
         getProgramIdentifier(transaction);
+
+      console.log(
+        `[Sanity] Program identifier: ${
+          programIdentifier || 'tidak ditemukan'
+        }`
+      );
+
+      // =======================================================================
+      // CARI PROGRAM
+      // =======================================================================
 
       if (programIdentifier) {
         const programQuery = `
@@ -410,25 +464,48 @@ export async function POST(request: Request) {
           ][0]
         `;
 
-        const programDoc = await client.fetch(
-          programQuery,
-          {
-            identifier: programIdentifier,
-          }
-        );
+        programDoc =
+          await client.fetch(
+            programQuery,
+            {
+              identifier:
+                programIdentifier,
+            }
+          );
 
         if (programDoc) {
           programTitle =
             programDoc.title ||
-            programTitle;
+            'Program Kebaikan';
 
-          const currentCollected = Number(
-            programDoc.collectedAmount || 0
+          console.log(
+            `[Sanity] Program ditemukan: ${programTitle}`
           );
+        } else {
+          console.warn(
+            `[Sanity Warning] Program "${programIdentifier}" tidak ditemukan.`
+          );
+        }
+      }
 
-          const newCollected =
-            currentCollected + donationAmount;
+      // =======================================================================
+      // CEK APAKAH SALDO SUDAH PERNAH DIPROSES
+      // =======================================================================
 
+      const alreadyProcessed =
+        transaction.pakasirWebhookProcessed === true;
+
+      if (alreadyProcessed) {
+        console.log(
+          `[Pakasir] Transaksi ${orderId} sudah pernah diproses. ` +
+          `Saldo tidak ditambahkan lagi.`
+        );
+      } else {
+        // =====================================================================
+        // 5. TAMBAH SALDO PROGRAM
+        // =====================================================================
+
+        if (programDoc) {
           const newDonorEntry = {
             _key:
               `${Date.now()}-${Math.random()
@@ -437,162 +514,263 @@ export async function POST(request: Request) {
 
             name: donorName,
 
-            amount: donationAmount,
+            amount:
+              donationAmount,
 
-            date: new Date().toLocaleDateString(
-              'id-ID',
-              {
-                day: 'numeric',
-                month: 'short',
-                year: 'numeric',
-                timeZone: 'Asia/Jakarta',
-              }
-            ),
+            date:
+              new Date().toLocaleDateString(
+                'id-ID',
+                {
+                  day: 'numeric',
+                  month: 'short',
+                  year: 'numeric',
+                  timeZone:
+                    'Asia/Jakarta',
+                }
+              ),
           };
 
-          // ===================================================================
-          // UPDATE TOTAL DONASI + DAFTAR DONATUR
-          // ===================================================================
+          // ================================================================
+          // TRANSACTION:
+          // Update program + transaksi dalam satu commit
+          // ================================================================
 
-          await client
-            .patch(programDoc._id)
-            .set({
-              collectedAmount: newCollected,
-            })
-            .setIfMissing({
-              donors: [],
-            })
-            .append(
-              'donors',
-              [newDonorEntry]
-            )
-            .commit();
+          const sanityTransaction =
+            client.transaction();
+
+          sanityTransaction.patch(
+            programDoc._id,
+            (patch) =>
+              patch
+                .setIfMissing({
+                  collectedAmount: 0,
+                  donors: [],
+                })
+                .inc({
+                  collectedAmount:
+                    donationAmount,
+                })
+                .append(
+                  'donors',
+                  [newDonorEntry]
+                )
+          );
+
+          sanityTransaction.patch(
+            transaction._id,
+            (patch) =>
+              patch.set({
+                status: 'success',
+
+                paymentMethod:
+                  payment_method ||
+                  transaction.paymentMethod ||
+                  '',
+
+                completedAt:
+                  completed_at ||
+                  new Date().toISOString(),
+
+                pakasirWebhookProcessed:
+                  true,
+
+                pakasirWebhookProcessedAt:
+                  new Date().toISOString(),
+              })
+          );
+
+          await sanityTransaction.commit();
 
           console.log(
-            `[Sanity] Dana program "${programTitle}" berhasil ditambahkan sebesar Rp ${donationAmount.toLocaleString(
+            `[Sanity Success] Saldo "${programTitle}" bertambah Rp ${donationAmount.toLocaleString(
               'id-ID'
             )}.`
           );
         } else {
+          // =================================================================
+          // PROGRAM TIDAK DITEMUKAN
+          // Tetap update transaksi, tapi jangan tandai webhookProcessed
+          // supaya bisa dicoba ulang setelah masalah program diperbaiki.
+          // =================================================================
+
+          await client
+            .patch(transaction._id)
+            .set({
+              status: 'success',
+
+              paymentMethod:
+                payment_method ||
+                transaction.paymentMethod ||
+                '',
+
+              completedAt:
+                completed_at ||
+                new Date().toISOString(),
+            })
+            .commit();
+
           console.warn(
-            `[Sanity Warning] Program ${programIdentifier} tidak ditemukan.`
+            `[Sanity Warning] Status transaksi ${orderId} sudah SUCCESS, ` +
+            `tetapi saldo program belum ditambahkan karena program tidak ditemukan.`
           );
         }
-      } else {
-        console.warn(
-          `[Sanity Warning] Program pada transaksi ${orderId} tidak ditemukan.`
-        );
       }
 
       // =======================================================================
-      // 5. UPDATE STATUS TRANSAKSI MENJADI SUCCESS
+      // JIKA SUDAH PROSES SALDO TAPI STATUS BELUM SUCCESS
       // =======================================================================
 
-      await client
-        .patch(transaction._id)
-        .set({
-          status: 'success',
+      if (
+        alreadyProcessed &&
+        String(transaction.status || '').toLowerCase() !==
+          'success'
+      ) {
+        await client
+          .patch(transaction._id)
+          .set({
+            status: 'success',
 
-          paymentMethod:
-            payment_method ||
-            transaction.paymentMethod ||
-            '',
+            paymentMethod:
+              payment_method ||
+              transaction.paymentMethod ||
+              '',
 
-          completedAt:
-            completed_at ||
-            new Date().toISOString(),
-        })
-        .commit();
-
-      console.log(
-        `[Sanity] Transaksi ${orderId} berhasil diubah menjadi SUCCESS.`
-      );
+            completedAt:
+              completed_at ||
+              new Date().toISOString(),
+          })
+          .commit();
+      }
     } else {
       // =========================================================================
-      // TRANSAKSI TIDAK DITEMUKAN DI SANITY
+      // TRANSAKSI TIDAK DITEMUKAN
       // =========================================================================
 
       console.warn(
-        `[Sanity Warning] Transaksi ${orderId} tidak ditemukan di Sanity.`
+        `[Sanity Warning] Transaksi ${orderId} tidak ditemukan.`
       );
-
-      donorPhone =
-        body.phone ||
-        body.whatsapp ||
-        body.donorPhone ||
-        '';
 
       donorName =
-        body.name ||
         body.donorName ||
+        body.name ||
         'Hamba Allah';
 
-      donationAmount = Number(
-        amount || 0
-      );
+      donorPhone =
+        body.donorPhone ||
+        body.phone ||
+        body.whatsapp ||
+        '';
+
+      donationAmount =
+        Number(amount || 0);
     }
 
     // =========================================================================
-    // 6. KIRIM WHATSAPP KE DONATUR
+    // 6. KIRIM NOTIFIKASI WHATSAPP
     // =========================================================================
 
-    // Tidak ada lagi fallback nomor WA hardcode.
-    // Jika nomor donatur tidak tersedia, WA tidak dikirim.
-    if (donorPhone) {
-      await sendFonnteNotification(
-        donorPhone,
-        donorName,
-        donationAmount,
-        programTitle,
-        orderId
+    let whatsappSent = false;
+
+    // Jika transaksi sudah pernah menerima WA,
+    // jangan kirim dua kali.
+    const alreadyNotified =
+      transaction?.fonnteNotificationSent === true;
+
+    if (alreadyNotified) {
+      console.log(
+        `[Fonnte] Transaksi ${orderId} sudah pernah dikirim WA.`
       );
+    } else if (donorPhone) {
+      whatsappSent =
+        await sendFonnteNotification(
+          donorPhone,
+          donorName,
+          donationAmount,
+          programTitle,
+          orderId
+        );
+
+      // =====================================================================
+      // TANDAI WA SUDAH DIKIRIM
+      // =====================================================================
+
+      if (
+        whatsappSent &&
+        transaction?._id
+      ) {
+        try {
+          await client
+            .patch(transaction._id)
+            .set({
+              fonnteNotificationSent:
+                true,
+
+              fonnteNotificationSentAt:
+                new Date().toISOString(),
+            })
+            .commit();
+
+          console.log(
+            `[Fonnte] Status notifikasi WA ${orderId} tersimpan di Sanity.`
+          );
+        } catch (markError) {
+          console.error(
+            '[Fonnte Warning] WA berhasil dikirim tetapi gagal menandai status notifikasi:',
+            markError
+          );
+        }
+      }
     } else {
       console.warn(
-        `[Fonnte Warning] Nomor WhatsApp donatur tidak ditemukan untuk ${orderId}.`
+        `[Fonnte Warning] Nomor WhatsApp tidak ditemukan untuk transaksi ${orderId}.`
       );
     }
 
     // =========================================================================
-    // 7. SINKRONISASI GOOGLE SHEET
-    // ============================================================================
+    // 7. GOOGLE SHEET
+    // =========================================================================
 
     const googleSheetScriptUrl =
       process.env.GOOGLE_SHEET_WEBHOOK_URL?.trim();
 
     if (googleSheetScriptUrl) {
       try {
-        const sheetResponse = await fetch(
-          googleSheetScriptUrl,
-          {
-            method: 'POST',
+        const sheetResponse =
+          await fetch(
+            googleSheetScriptUrl,
+            {
+              method: 'POST',
 
-            headers: {
-              'Content-Type':
-                'application/json',
-            },
+              headers: {
+                'Content-Type':
+                  'application/json',
+              },
 
-            body: JSON.stringify({
-              orderId,
-              status: 'success',
+              body:
+                JSON.stringify({
+                  orderId,
+                  status:
+                    'success',
 
-              completedAt:
-                completed_at ||
-                new Date().toLocaleString(
-                  'id-ID',
-                  {
-                    timeZone:
-                      'Asia/Jakarta',
-                  }
-                ),
-            }),
+                  completedAt:
+                    completed_at ||
+                    new Date().toLocaleString(
+                      'id-ID',
+                      {
+                        timeZone:
+                          'Asia/Jakarta',
+                      }
+                    ),
+                }),
 
-            cache: 'no-store',
-          }
-        );
+              cache:
+                'no-store',
+            }
+          );
 
         if (sheetResponse.ok) {
           console.log(
-            `[Google Sheet] Transaksi ${orderId} berhasil disinkronkan.`
+            `[Google Sheet] ${orderId} berhasil disinkronkan.`
           );
         } else {
           console.error(
@@ -601,19 +779,36 @@ export async function POST(request: Request) {
         }
       } catch (sheetError) {
         console.error(
-          '[Google Sheet Error] Gagal memperbarui Google Sheet:',
+          '[Google Sheet Error]',
           sheetError
         );
       }
     }
 
     // =========================================================================
-    // SELESAI
+    // RESPONSE WEBHOOK
     // =========================================================================
 
     return NextResponse.json({
       success: true,
-      message: 'Webhook processed successfully',
+
+      message:
+        'Webhook processed successfully',
+
+      orderId,
+
+      transactionFound:
+        Boolean(transaction),
+
+      programFound:
+        Boolean(programDoc),
+
+      whatsapp:
+        alreadyNotified
+          ? 'already-sent'
+          : whatsappSent
+            ? 'sent'
+            : 'not-sent',
     });
   } catch (error: unknown) {
     console.error(
