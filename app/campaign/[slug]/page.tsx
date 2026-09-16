@@ -1,146 +1,661 @@
 // app/campaign/[slug]/page.tsx
-import { Metadata } from "next";
-import CampaignDetailClient from "@/components/CampaignDetailClient";
+
+import type { Metadata } from "next";
 import { createClient } from "@sanity/client";
 
+import CampaignDetailClient from "@/components/CampaignDetailClient";
+
+// ============================================================
+// TYPES
+// ============================================================
+
 interface Props {
-  params: Promise<{ slug: string }>;
-  searchParams: Promise<{ ref?: string }>;
+  params: Promise<{
+    slug: string;
+  }>;
+
+  searchParams: Promise<{
+    ref?: string;
+    v?: string;
+  }>;
 }
+
+interface CampaignMetadata {
+  _id?: string;
+  title?: string;
+  slug?: string;
+
+  description?: unknown;
+  excerpt?: unknown;
+  shortDescription?: unknown;
+
+  imageUrl?: string;
+  imageAlt?: string;
+
+  publishedAt?: string;
+  _updatedAt?: string;
+}
+
+// ============================================================
+// IDENTITAS MUKHLASIN
+// ============================================================
+
+const SITE_NAME = "Mukhlasin";
+
+const SITE_URL = (
+  process.env.NEXT_PUBLIC_SITE_URL ||
+  "https://mukhlasin.or.id"
+).replace(/\/$/, "");
+
+const PROJECT_ID =
+  process.env.NEXT_PUBLIC_SANITY_PROJECT_ID ||
+  "xqggeww8";
+
+const DATASET =
+  process.env.NEXT_PUBLIC_SANITY_DATASET ||
+  "production";
+
+// ============================================================
+// SANITY SERVER CLIENT
+//
+// Tidak memakai token.
+// Metadata publik tidak perlu write token.
+// ============================================================
+
+const sanityMetaClient = createClient({
+  projectId: PROJECT_ID,
+  dataset: DATASET,
+  useCdn: false,
+  apiVersion: "2026-08-01",
+  perspective: "published",
+});
+
+// ============================================================
+// NEXT.JS
+// ============================================================
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-const sanityMetaClient = createClient({
-  projectId: "xqggeww8",
-  dataset: "production",
-  useCdn: false,
-  apiVersion: "2024-01-01",
-  token: "skzKLS9YXZtUK01FN8VMv2TUleuscVo9d9SXtqAlcLjt3MvaRh0IWaaruV6ObSlpJwD5UoDI0QpPJ26Xh8EpaZsK7DIIMSZ1aq7EnLzUiCUY7aHsAm1a6LeJZb9I9ygWcRTKjEJzw8c5rRCbcFAxPhzjvAgPF715JSXnJxy2lbtWm6ePtVfl",
-});
+// ============================================================
+// NORMALIZE SLUG
+// ============================================================
+
+function normalizeSlug(
+  value: string
+): string {
+  try {
+    return decodeURIComponent(value).trim();
+  } catch {
+    return value.trim();
+  }
+}
+
+// ============================================================
+// PORTABLE TEXT -> PLAIN TEXT
+// ============================================================
+
+function portableTextToPlainText(
+  value: unknown
+): string {
+  if (!value) {
+    return "";
+  }
+
+  // ----------------------------------------------------------
+  // STRING / HTML
+  // ----------------------------------------------------------
+
+  if (typeof value === "string") {
+    return value
+      .replace(/<[^>]*>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  // ----------------------------------------------------------
+  // SANITY PORTABLE TEXT
+  // ----------------------------------------------------------
+
+  if (Array.isArray(value)) {
+    return value
+      .filter(
+        (block: any) =>
+          block?._type === "block" &&
+          Array.isArray(block.children)
+      )
+      .map((block: any) =>
+        block.children
+          .map((child: any) =>
+            typeof child?.text === "string"
+              ? child.text
+              : ""
+          )
+          .join("")
+      )
+      .join(" ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  return "";
+}
+
+// ============================================================
+// DESCRIPTION SEO
+// ============================================================
+
+function makeDescription(
+  value: unknown,
+  fallback: string,
+  maxLength = 180
+): string {
+  const plainText =
+    portableTextToPlainText(value);
+
+  if (!plainText) {
+    return fallback;
+  }
+
+  if (plainText.length <= maxLength) {
+    return plainText;
+  }
+
+  return `${plainText
+    .slice(0, maxLength)
+    .trimEnd()}...`;
+}
+
+// ============================================================
+// NORMALIZE IMAGE URL
+// ============================================================
+
+function normalizeImageUrl(
+  value: unknown
+): string {
+  const fallback =
+    `${SITE_URL}/images/banner.png`;
+
+  if (
+    typeof value !== "string" ||
+    !value.trim()
+  ) {
+    return fallback;
+  }
+
+  const image = value.trim();
+
+  if (
+    image.startsWith("https://") ||
+    image.startsWith("http://")
+  ) {
+    return image;
+  }
+
+  return `${SITE_URL}${
+    image.startsWith("/") ? "" : "/"
+  }${image}`;
+}
+
+// ============================================================
+// SOCIAL IMAGE
+//
+// Untuk Sanity:
+// gambar asli
+//      ↓
+// JPEG
+//      ↓
+// 1200 × 630
+//      ↓
+// quality 85
+//
+// Hanya digunakan untuk social preview.
+// Gambar asli CampaignDetailClient tidak diubah.
+// ============================================================
+
+function createSocialImageUrl(
+  originalImage: string
+): string {
+  if (!originalImage) {
+    return `${SITE_URL}/images/banner.png`;
+  }
+
+  if (
+    originalImage.includes(
+      "cdn.sanity.io/images/"
+    )
+  ) {
+    try {
+      const url =
+        new URL(originalImage);
+
+      url.searchParams.set(
+        "fm",
+        "jpg"
+      );
+
+      url.searchParams.set(
+        "w",
+        "1200"
+      );
+
+      url.searchParams.set(
+        "h",
+        "630"
+      );
+
+      url.searchParams.set(
+        "fit",
+        "crop"
+      );
+
+      url.searchParams.set(
+        "q",
+        "85"
+      );
+
+      return url.toString();
+    } catch {
+      return originalImage;
+    }
+  }
+
+  return originalImage;
+}
+
+// ============================================================
+// FETCH CAMPAIGN LANGSUNG DARI SANITY
+// ============================================================
+
+async function getCampaignMetadata(
+  slug: string
+): Promise<CampaignMetadata | null> {
+  if (!slug) {
+    return null;
+  }
+
+  try {
+    const campaign =
+      await sanityMetaClient.fetch<
+        CampaignMetadata | null
+      >(
+        `
+          *[
+            _type in ["program", "campaign"] &&
+            defined(slug.current) &&
+            lower(slug.current) == lower($slug)
+          ][0] {
+            _id,
+
+            title,
+
+            "slug": slug.current,
+
+            description,
+
+            excerpt,
+
+            shortDescription,
+
+            publishedAt,
+
+            _updatedAt,
+
+            "imageUrl": coalesce(
+              image.asset->url,
+              mainImage.asset->url,
+              thumbnail.asset->url,
+              coverImage.asset->url,
+              banner.asset->url
+            ),
+
+            "imageAlt": coalesce(
+              image.alt,
+              mainImage.alt,
+              thumbnail.alt,
+              coverImage.alt,
+              banner.alt,
+              title
+            )
+          }
+        `,
+        {
+          slug,
+        },
+        {
+          cache: "no-store",
+        }
+      );
+
+    return campaign || null;
+  } catch (error) {
+    console.error(
+      "🔥 MUKHLASIN CAMPAIGN METADATA ERROR:",
+      error
+    );
+
+    return null;
+  }
+}
+
+// ============================================================
+// GENERATE METADATA
+// ============================================================
 
 export async function generateMetadata({
   params,
-}: {
-  params: Promise<{ slug: string }>;
-}): Promise<Metadata> {
-  const { slug } = await params;
-  const decodedSlug = decodeURIComponent(slug).trim();
+}: Props): Promise<Metadata> {
+  const { slug } =
+    await params;
 
-  const siteUrl = (
-    process.env.NEXT_PUBLIC_SITE_URL ||
-    "https://www.islami.or.id"
-  ).replace(/\/$/, "");
+  const cleanSlug =
+    normalizeSlug(slug);
 
-  let title = "Program Donasi | islami.or.id";
-  let description = "Salurkan sedekah, infak, zakat, dan wakaf terbaik Anda melalui islami.or.id.";
-  let image = `${siteUrl}/images/banner.png`;
+  // ==========================================================
+  // CANONICAL
+  // ==========================================================
 
-  try {
-    // 🚀 Ambil langsung dari Sanity agar pasti valid di Server Production
-    const query = `*[(_type == "program" || _type == "campaign") && (slug.current == $slug || _id == $slug)][0] {
-      title,
-      description,
-      excerpt,
-      "mainImageUrl": mainImage.asset->url,
-      "imageUrl": image.asset->url,
-      "thumbnailUrl": thumbnail.asset->url,
-      "bannerUrl": banner.asset->url
-    }`;
+  const canonicalUrl =
+    `${SITE_URL}/campaign/${encodeURIComponent(
+      cleanSlug
+    )}`;
 
-    const campaign = await sanityMetaClient.fetch(query, { slug: decodedSlug });
+  // ==========================================================
+  // SANITY
+  // ==========================================================
 
-    if (campaign) {
-      if (campaign.title) {
-        title = campaign.title;
-      }
+  const campaign =
+    await getCampaignMetadata(
+      cleanSlug
+    );
 
-      const rawDesc = campaign.excerpt || campaign.description;
-      if (rawDesc) {
-        if (typeof rawDesc === 'string') {
-          description = rawDesc.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim().substring(0, 160);
-        } else if (Array.isArray(rawDesc)) {
-          const plainText = rawDesc
-            .filter((block: any) => block._type === 'block' && block.children)
-            .map((block: any) => block.children.map((child: any) => child.text).join(''))
-            .join(' ');
-          if (plainText) {
-            description = plainText.replace(/\s+/g, " ").trim().substring(0, 160);
-          }
-        }
-      }
+  // ==========================================================
+  // TITLE
+  // ==========================================================
 
-      const foundImage = campaign.mainImageUrl || campaign.imageUrl || campaign.thumbnailUrl || campaign.bannerUrl;
-      if (foundImage) {
-        image = foundImage;
-      }
-    }
-  } catch (err) {
-    console.error("Sanity Metadata Error:", err);
+  const title =
+    typeof campaign?.title === "string" &&
+    campaign.title.trim()
+      ? campaign.title.trim()
+      : `Program Donasi | ${SITE_NAME}`;
+
+  // ==========================================================
+  // DESCRIPTION
+  // ==========================================================
+
+  const fallbackDescription =
+    `Salurkan zakat, infak, sedekah, wakaf, dan donasi terbaik Anda melalui ${SITE_NAME}.`;
+
+  let description = "";
+
+  if (campaign?.excerpt) {
+    description =
+      makeDescription(
+        campaign.excerpt,
+        ""
+      );
   }
 
-  // Bersihkan parameter format gambar jika ada
-  image = image
-    .replace("?format=jpg", "")
-    .replace("&format=jpg", "")
-    .replace("?fm=jpg", "")
-    .replace("&fm=jpg", "");
-
-  // 🚀 Pastikan URL Gambar Absolut menggunakan domain publik (Cegah isu localhost)
-  if (image.startsWith("/")) {
-    image = `${siteUrl}${image}`;
-  } else if (!image.startsWith("http")) {
-    image = `${siteUrl}/${image}`;
+  if (
+    !description &&
+    campaign?.shortDescription
+  ) {
+    description =
+      makeDescription(
+        campaign.shortDescription,
+        ""
+      );
   }
+
+  if (
+    !description &&
+    campaign?.description
+  ) {
+    description =
+      makeDescription(
+        campaign.description,
+        ""
+      );
+  }
+
+  if (!description) {
+    description =
+      fallbackDescription;
+  }
+
+  // ==========================================================
+  // ORIGINAL IMAGE
+  // ==========================================================
+
+  const originalImage =
+    normalizeImageUrl(
+      campaign?.imageUrl
+    );
+
+  // ==========================================================
+  // SOCIAL IMAGE
+  // ==========================================================
+
+  const socialImage =
+    createSocialImageUrl(
+      originalImage
+    );
+
+  const imageAlt =
+    typeof campaign?.imageAlt === "string" &&
+    campaign.imageAlt.trim()
+      ? campaign.imageAlt.trim()
+      : title;
+
+  // ==========================================================
+  // DEBUG VERCEL
+  // ==========================================================
+
+  console.log(
+    "========================================"
+  );
+
+  console.log(
+    "💚 MUKHLASIN CAMPAIGN METADATA"
+  );
+
+  console.log(
+    "Slug:",
+    cleanSlug
+  );
+
+  console.log(
+    "Campaign found:",
+    Boolean(campaign)
+  );
+
+  console.log(
+    "Campaign ID:",
+    campaign?._id || "NOT FOUND"
+  );
+
+  console.log(
+    "Title:",
+    title
+  );
+
+  console.log(
+    "Original Image:",
+    originalImage
+  );
+
+  console.log(
+    "Social OG Image:",
+    socialImage
+  );
+
+  console.log(
+    "Canonical:",
+    canonicalUrl
+  );
+
+  console.log(
+    "========================================"
+  );
+
+  // ==========================================================
+  // METADATA
+  // ==========================================================
 
   return {
-    metadataBase: new URL(siteUrl),
+    metadataBase:
+      new URL(SITE_URL),
+
     title,
+
     description,
+
+    // ========================================================
+    // CANONICAL
+    // ========================================================
+
     alternates: {
-      canonical: `${siteUrl}/campaign/${slug}`,
+      canonical:
+        canonicalUrl,
     },
+
+    // ========================================================
+    // ROBOTS
+    // ========================================================
+
     robots: {
       index: true,
       follow: true,
+
+      googleBot: {
+        index: true,
+        follow: true,
+
+        "max-image-preview":
+          "large",
+      },
     },
+
+    // ========================================================
+    // OPEN GRAPH
+    // ========================================================
+
     openGraph: {
-      type: "website",
-      url: `${siteUrl}/campaign/${slug}`,
-      siteName: "islami.or.id",
-      locale: "id_ID",
+      type: "article",
+
+      url:
+        canonicalUrl,
+
+      siteName:
+        SITE_NAME,
+
+      locale:
+        "id_ID",
+
       title,
+
       description,
+
       images: [
         {
-          url: image,
-          width: 1200,
-          height: 630,
-          alt: title,
-          type: "image/jpeg",
+          url:
+            socialImage,
+
+          secureUrl:
+            socialImage,
+
+          width:
+            1200,
+
+          height:
+            630,
+
+          type:
+            "image/jpeg",
+
+          alt:
+            imageAlt,
+        },
+      ],
+
+      ...(campaign?.publishedAt
+        ? {
+            publishedTime:
+              campaign.publishedAt,
+          }
+        : {}),
+    },
+
+    // ========================================================
+    // TWITTER / X
+    // ========================================================
+
+    twitter: {
+      card:
+        "summary_large_image",
+
+      title,
+
+      description,
+
+      images: [
+        {
+          url:
+            socialImage,
+
+          alt:
+            imageAlt,
         },
       ],
     },
-    twitter: {
-      card: "summary_large_image",
-      title,
-      description,
-      images: [image],
+
+    // ========================================================
+    // EXTRA SOCIAL META
+    //
+    // Sengaja menghasilkan:
+    //
+    // name="og:image"
+    // name="og:image:secure_url"
+    //
+    // selain property="og:image" dari openGraph.images.
+    //
+    // Ini mengikuti pola News BMA yang sudah berhasil
+    // menampilkan thumbnail di WhatsApp.
+    // ========================================================
+
+    other: {
+      "og:image":
+        socialImage,
+
+      "og:image:secure_url":
+        socialImage,
     },
   };
 }
+
+// ============================================================
+// PAGE
+// ============================================================
 
 export default async function CampaignPage({
   params,
   searchParams,
 }: Props) {
-  const { slug } = await params;
-  const { ref } = await searchParams;
+  const { slug } =
+    await params;
+
+  const { ref } =
+    await searchParams;
+
+  const cleanSlug =
+    normalizeSlug(slug);
 
   return (
     <CampaignDetailClient
-      slug={slug}
-      referral={ref ?? null}
+      slug={cleanSlug}
+      referral={
+        ref ?? null
+      }
     />
   );
 }
