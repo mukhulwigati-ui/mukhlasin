@@ -24,18 +24,44 @@ const HOME_TITLE =
 const HOME_DESCRIPTION =
   'Platform sedekah, zakat, dan wakaf terpercaya.';
 
-// Gambar preview homepage WhatsApp / Facebook / X
+// ============================================================================
+// HOMEPAGE OPEN GRAPH IMAGE
+//
+// File:
+// public/images/og-home.jpg
+//
+// Format:
+// JPEG
+//
+// Ukuran:
+// 1200 x 630
+//
+// Dibuat khusus lebih ringan agar mudah dibaca crawler WhatsApp / Meta.
+// ============================================================================
+
 const HOME_OG_IMAGE =
-  `${SITE_URL}/images/banner.png`;
+  `${SITE_URL}/images/og-home.jpg`;
 
 // ============================================================================
 // HOMEPAGE METADATA
 // ============================================================================
 
 export const metadata: Metadata = {
+  // --------------------------------------------------------------------------
+  // METADATA BASE
+  // --------------------------------------------------------------------------
+
   metadataBase: new URL(SITE_URL),
 
+  // --------------------------------------------------------------------------
+  // TITLE
+  // --------------------------------------------------------------------------
+
   title: HOME_TITLE,
+
+  // --------------------------------------------------------------------------
+  // DESCRIPTION
+  // --------------------------------------------------------------------------
 
   description:
     'Salurkan sedekah, infak, zakat, dan wakaf terbaik Anda melalui program terpercaya di mukhlasin.or.id.',
@@ -50,7 +76,13 @@ export const metadata: Metadata = {
 
   // --------------------------------------------------------------------------
   // OPEN GRAPH
-  // WhatsApp / Facebook / Telegram / LinkedIn
+  //
+  // Digunakan oleh:
+  // WhatsApp
+  // Facebook
+  // Telegram
+  // LinkedIn
+  // dan crawler sosial lainnya.
   // --------------------------------------------------------------------------
 
   openGraph: {
@@ -76,9 +108,10 @@ export const metadata: Metadata = {
 
         height: 630,
 
-        type: 'image/png',
+        type: 'image/jpeg',
 
-        alt: 'mukhlasin.or.id - Yayasan Darul Mukhlasin Kroya',
+        alt:
+          'mukhlasin.or.id - Yayasan Darul Mukhlasin Kroya',
       },
     ],
   },
@@ -102,25 +135,41 @@ export const metadata: Metadata = {
 
         height: 630,
 
-        alt: 'mukhlasin.or.id - Yayasan Darul Mukhlasin Kroya',
+        alt:
+          'mukhlasin.or.id - Yayasan Darul Mukhlasin Kroya',
       },
     ],
   },
 
   // --------------------------------------------------------------------------
-  // TAMBAHAN UNTUK CRAWLER SOSIAL
+  // META TAMBAHAN UNTUK CRAWLER SOSIAL
   //
-  // Sengaja dibuat seperti metadata campaign yang sudah berhasil di WhatsApp.
+  // Sengaja menggunakan pola yang sama seperti campaign yang sudah
+  // berhasil menampilkan preview gambar di WhatsApp.
+  //
+  // Ini menghasilkan tambahan:
+  //
+  // <meta name="og:image" ...>
+  // <meta name="og:image:secure_url" ...>
+  //
+  // Sedangkan openGraph.images menghasilkan:
+  //
+  // <meta property="og:image" ...>
+  // <meta property="og:image:secure_url" ...>
+  // <meta property="og:image:type" content="image/jpeg">
+  // <meta property="og:image:width" content="1200">
+  // <meta property="og:image:height" content="630">
   // --------------------------------------------------------------------------
 
   other: {
     'og:image': HOME_OG_IMAGE,
+
     'og:image:secure_url': HOME_OG_IMAGE,
   },
 };
 
 // ============================================================================
-// SANITY
+// SANITY CONFIG
 // ============================================================================
 
 const projectId =
@@ -134,10 +183,17 @@ const dataset =
   process.env.NEXT_DATASET ||
   'production';
 
+// ============================================================================
+// SANITY SERVER CLIENT
+// ============================================================================
+
 const serverClient = createClient({
   projectId,
+
   dataset,
+
   useCdn: true,
+
   apiVersion: '2024-01-01',
 });
 
@@ -146,6 +202,7 @@ const serverClient = createClient({
 // ============================================================================
 
 export const dynamic = 'force-dynamic';
+
 export const revalidate = 0;
 
 // ============================================================================
@@ -156,7 +213,9 @@ export default async function HomePage() {
   let heroBanners: HeroBanner[] = [];
 
   let mendesakPrograms: any[] = [];
+
   let unggulanPrograms: any[] = [];
+
   let pilihanPrograms: any[] = [];
 
   try {
@@ -169,13 +228,23 @@ export default async function HomePage() {
         _type in ["heroBanner", "banner", "hero"]
       ] | order(_createdAt desc)[0...5] {
         "id": _id,
-        "title": coalesce(title, name, "Program Kebaikan"),
+
+        "title": coalesce(
+          title,
+          name,
+          "Program Kebaikan"
+        ),
+
         "imageUrl": coalesce(
           image.asset->url,
           banner.asset->url,
           mainImage.asset->url
         ),
-        "linkUrl": coalesce(link, slug.current)
+
+        "linkUrl": coalesce(
+          link,
+          slug.current
+        )
       },
 
       "mendesak": *[
@@ -183,27 +252,42 @@ export default async function HomePage() {
         sectionType == "mendesak"
       ] | order(_createdAt desc)[0...4] {
         "id": _id,
-        "title": coalesce(title, name, "Program Donasi"),
-        "slug": coalesce(slug.current, slug, _id),
+
+        "title": coalesce(
+          title,
+          name,
+          "Program Donasi"
+        ),
+
+        "slug": coalesce(
+          slug.current,
+          slug,
+          _id
+        ),
+
         "image": coalesce(
           image.asset->url,
           mainImage.asset->url,
           thumbnail.asset->url,
           banner.asset->url
         ),
+
         "collectedAmount": coalesce(
           collectedAmount,
           collectedRaw,
           0
         ),
+
         "targetAmount": coalesce(
           targetAmount,
           50000000
         ),
+
         "daysLeft": coalesce(
           daysLeft,
           30
         ),
+
         "donors": donors
       },
 
@@ -212,27 +296,42 @@ export default async function HomePage() {
         sectionType == "unggulan"
       ] | order(_createdAt desc)[0...4] {
         "id": _id,
-        "title": coalesce(title, name, "Program Donasi"),
-        "slug": coalesce(slug.current, slug, _id),
+
+        "title": coalesce(
+          title,
+          name,
+          "Program Donasi"
+        ),
+
+        "slug": coalesce(
+          slug.current,
+          slug,
+          _id
+        ),
+
         "image": coalesce(
           image.asset->url,
           mainImage.asset->url,
           thumbnail.asset->url,
           banner.asset->url
         ),
+
         "collectedAmount": coalesce(
           collectedAmount,
           collectedRaw,
           0
         ),
+
         "targetAmount": coalesce(
           targetAmount,
           50000000
         ),
+
         "daysLeft": coalesce(
           daysLeft,
           30
         ),
+
         "donors": donors
       },
 
@@ -241,27 +340,42 @@ export default async function HomePage() {
         sectionType == "pilihan"
       ] | order(_createdAt desc)[0...6] {
         "id": _id,
-        "title": coalesce(title, name, "Program Donasi"),
-        "slug": coalesce(slug.current, slug, _id),
+
+        "title": coalesce(
+          title,
+          name,
+          "Program Donasi"
+        ),
+
+        "slug": coalesce(
+          slug.current,
+          slug,
+          _id
+        ),
+
         "image": coalesce(
           image.asset->url,
           mainImage.asset->url,
           thumbnail.asset->url,
           banner.asset->url
         ),
+
         "collectedAmount": coalesce(
           collectedAmount,
           collectedRaw,
           0
         ),
+
         "targetAmount": coalesce(
           targetAmount,
           50000000
         ),
+
         "daysLeft": coalesce(
           daysLeft,
           30
         ),
+
         "donors": donors
       }
     }`;
@@ -286,7 +400,8 @@ export default async function HomePage() {
             item.id ||
             Math.random().toString(),
 
-          title: item.title,
+          title:
+            item.title,
 
           imageUrl:
             item.imageUrl ||
@@ -307,7 +422,8 @@ export default async function HomePage() {
     if (heroBanners.length === 0) {
       heroBanners = [
         {
-          _id: 'default-banner',
+          _id:
+            'default-banner',
 
           title:
             'Mari Salurkan Kebaikan Bersama mukhlasin.or.id',
@@ -330,7 +446,6 @@ export default async function HomePage() {
 
     pilihanPrograms =
       data?.pilihan || [];
-
   } catch (err) {
     console.error(
       '🔥 Gagal mengambil data homepage dari Sanity:',
@@ -344,30 +459,45 @@ export default async function HomePage() {
 
   return (
     <main className="min-h-screen bg-gray-50 flex flex-col items-center justify-start w-full overflow-x-hidden pb-24">
-
       <div className="w-full max-w-md mx-auto px-3 py-4 space-y-4">
 
-        {/* HERO */}
-        <Hero initialBanners={heroBanners} />
+        {/* ==================================================================
+            HERO
+        ================================================================== */}
 
-        {/* TOTAL AKUMULASI DONASI */}
+        <Hero
+          initialBanners={heroBanners}
+        />
+
+        {/* ==================================================================
+            TOTAL AKUMULASI DONASI
+        ================================================================== */}
+
         <TotalAccumulationWidget />
 
-        {/* CAMPAIGN */}
+        {/* ==================================================================
+            CAMPAIGN
+        ================================================================== */}
+
         <Campaign
           mendesak={mendesakPrograms}
           unggulan={unggulanPrograms}
           pilihan={pilihanPrograms}
         />
 
-        {/* NEWS */}
+        {/* ==================================================================
+            NEWS
+        ================================================================== */}
+
         <News />
 
-        {/* FOOTER */}
+        {/* ==================================================================
+            FOOTER
+        ================================================================== */}
+
         <Footer />
 
       </div>
-
     </main>
   );
 }

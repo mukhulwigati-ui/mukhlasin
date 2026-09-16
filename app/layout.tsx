@@ -1,9 +1,15 @@
+// app/layout.tsx
+
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import LayoutClientWrapper from "@/components/LayoutClientWrapper";
 import BottomNav from "@/components/BottomNav";
 import Script from "next/script";
 import "./globals.css";
+
+// ============================================================================
+// FONT
+// ============================================================================
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -29,14 +35,33 @@ const HOME_TITLE =
 const HOME_DESCRIPTION =
   "Platform sedekah, zakat, dan wakaf terpercaya.";
 
+// ============================================================================
+// GAMBAR OPEN GRAPH HOMEPAGE
+//
+// File:
+// public/images/og-home.jpg
+//
+// Ukuran:
+// 1200 x 630
+//
+// Format:
+// JPEG
+//
+// Dibuat lebih ringan agar mudah dibaca crawler WhatsApp / Meta.
+// ============================================================================
+
 const HOME_OG_IMAGE =
-  `${SITE_URL}/images/banner.png`;
+  `${SITE_URL}/images/og-home.jpg`;
 
 // ============================================================================
 // MASTER SEO & PWA METADATA
 // ============================================================================
 
 export const metadata: Metadata = {
+  // --------------------------------------------------------------------------
+  // METADATA BASE
+  // --------------------------------------------------------------------------
+
   metadataBase: new URL(SITE_URL),
 
   // --------------------------------------------------------------------------
@@ -68,7 +93,7 @@ export const metadata: Metadata = {
   },
 
   // --------------------------------------------------------------------------
-  // SEO KEYWORDS
+  // KEYWORDS
   // --------------------------------------------------------------------------
 
   keywords: [
@@ -99,6 +124,7 @@ export const metadata: Metadata = {
   ],
 
   creator: SITE_NAME,
+
   publisher: SITE_NAME,
 
   // --------------------------------------------------------------------------
@@ -111,6 +137,8 @@ export const metadata: Metadata = {
 
   // --------------------------------------------------------------------------
   // OPEN GRAPH
+  //
+  // Digunakan WhatsApp, Facebook, Telegram, LinkedIn, dll.
   // --------------------------------------------------------------------------
 
   openGraph: {
@@ -136,9 +164,10 @@ export const metadata: Metadata = {
 
         height: 630,
 
-        type: "image/png",
+        type: "image/jpeg",
 
-        alt: "mukhlasin.or.id - Yayasan Darul Mukhlasin Kroya",
+        alt:
+          "mukhlasin.or.id - Yayasan Darul Mukhlasin Kroya",
       },
     ],
   },
@@ -162,25 +191,35 @@ export const metadata: Metadata = {
 
         height: 630,
 
-        alt: "mukhlasin.or.id - Yayasan Darul Mukhlasin Kroya",
+        alt:
+          "mukhlasin.or.id - Yayasan Darul Mukhlasin Kroya",
       },
     ],
   },
 
   // --------------------------------------------------------------------------
-  // TAMBAHAN UNTUK CRAWLER SOSIAL
+  // META TAMBAHAN UNTUK CRAWLER SOSIAL
   //
-  // Campaign kita sebelumnya berhasil dengan bentuk metadata ini.
-  // Ini membuat Next.js juga menghasilkan:
+  // Sengaja dipertahankan karena pola ini sudah terbukti terbaca pada
+  // halaman campaign.
+  //
+  // Akan menghasilkan tambahan:
   //
   // <meta name="og:image" ...>
   // <meta name="og:image:secure_url" ...>
   //
-  // Selain property="og:image" dari openGraph di atas.
+  // Sedangkan openGraph.images menghasilkan:
+  //
+  // <meta property="og:image" ...>
+  // <meta property="og:image:secure_url" ...>
+  // <meta property="og:image:type" ...>
+  // <meta property="og:image:width" ...>
+  // <meta property="og:image:height" ...>
   // --------------------------------------------------------------------------
 
   other: {
     "og:image": HOME_OG_IMAGE,
+
     "og:image:secure_url": HOME_OG_IMAGE,
   },
 
@@ -207,9 +246,9 @@ export const metadata: Metadata = {
   },
 
   // --------------------------------------------------------------------------
-  // GOOGLE VERIFICATION
+  // GOOGLE SEARCH CONSOLE
   //
-  // Ganti dengan token asli jika memang menggunakan Search Console.
+  // Kalau sudah mempunyai verification token asli, ganti nilai di bawah.
   // --------------------------------------------------------------------------
 
   verification: {
@@ -235,9 +274,9 @@ export default function RootLayout({
         className="min-h-screen bg-slate-100 flex flex-col text-slate-800"
         suppressHydrationWarning
       >
-        {/* ================================================================
+        {/* ==================================================================
             GOOGLE ANALYTICS GA4
-        ================================================================= */}
+        ================================================================== */}
 
         <Script
           strategy="afterInteractive"
@@ -251,7 +290,7 @@ export default function RootLayout({
             __html: `
               window.dataLayer = window.dataLayer || [];
 
-              function gtag(){
+              function gtag() {
                 dataLayer.push(arguments);
               }
 
@@ -264,17 +303,17 @@ export default function RootLayout({
           }}
         />
 
-        {/* ================================================================
+        {/* ==================================================================
             MAIN CONTENT
-        ================================================================= */}
+        ================================================================== */}
 
         <LayoutClientWrapper>
           {children}
         </LayoutClientWrapper>
 
-        {/* ================================================================
+        {/* ==================================================================
             GLOBAL BOTTOM NAVIGATION
-        ================================================================= */}
+        ================================================================== */}
 
         <BottomNav />
       </body>
