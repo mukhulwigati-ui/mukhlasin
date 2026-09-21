@@ -447,10 +447,10 @@ export default function AkunPage() {
               <img
                 src={profile.avatar}
                 alt={profile.name}
-                className="w-[62px] h-[62px] rounded-[22px] object-cover border border-[#d7b66a]/50 shadow-xl"
+                className="w-[62px] h-[62px] rounded-full object-cover border border-[#d7b66a]/50 shadow-xl"
               />
             ) : (
-              <div className="w-[62px] h-[62px] rounded-[22px] bg-white/10 border border-[#d7b66a]/40 flex items-center justify-center text-white font-bold text-xl">
+              <div className="w-[62px] h-[62px] rounded-full bg-white/10 border border-[#d7b66a]/40 flex items-center justify-center text-white font-bold text-xl">
                 {(profile?.name || 'D')
                   .charAt(0)
                   .toUpperCase()}

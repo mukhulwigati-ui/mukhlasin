@@ -1,4 +1,3 @@
-// app/donasi-saya/page.tsx
 'use client';
 
 import React, { useEffect, useState, useMemo } from 'react';
@@ -924,12 +923,11 @@ export default function DonasiSayaPage() {
 
                 <button
                   onClick={() => {
-                    navigator.clipboard.writeText(
-                      window.location.origin
-                    );
+                    const campaignUrl = `${window.location.origin}/campaign/${selectedDonation.slug || ''}`;
+                    navigator.clipboard.writeText(campaignUrl);
 
                     alert(
-                      'Tautan platform berhasil disalin untuk dibagikan!'
+                      'Tautan program donasi berhasil disalin untuk dibagikan!'
                     );
                   }}
                   className="rounded-xl bg-[#102a43] hover:bg-[#173d5d] text-white font-bold py-3 text-[8px] uppercase tracking-wider transition flex items-center justify-center gap-1.5"
