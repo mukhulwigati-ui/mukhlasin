@@ -1,36 +1,43 @@
 // app/auth/callback/route.ts
 
 import {
+  NextRequest,
   NextResponse,
 } from "next/server";
-
-import {
-  cookies,
-} from "next/headers";
 
 import {
   createServerClient,
 } from "@supabase/ssr";
 
-export const dynamic =
-  "force-dynamic";
-
-export const revalidate =
-  0;
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 // ============================================================================
-// AUTH CALLBACK
+// GOOGLE OAUTH CALLBACK
 // ============================================================================
 
 export async function GET(
-  request: Request
+  request: NextRequest
 ) {
   const requestUrl =
-    new URL(request.url);
+    request.nextUrl.clone();
+
+  // ==========================================================================
+  // 1. PARAMETER
+  // ==========================================================================
 
   const code =
     requestUrl.searchParams.get(
       "code"
+    );
+
+  /**
+   * Supabase versi baru mendukung flow ID untuk PKCE.
+   * Kalau parameter ini tersedia, kita teruskan ke exchangeCodeForSession().
+   */
+  const flowId =
+    requestUrl.searchParams.get(
+      "sb_flow_id"
     );
 
   const nextParam =
@@ -38,8 +45,18 @@ export async function GET(
       "next"
     );
 
+  const oauthError =
+    requestUrl.searchParams.get(
+      "error"
+    );
+
+  const errorDescription =
+    requestUrl.searchParams.get(
+      "error_description"
+    );
+
   // ==========================================================================
-  // SAFE REDIRECT
+  // 2. SAFE DESTINATION
   // ==========================================================================
 
   const next =
@@ -50,14 +67,44 @@ export async function GET(
       : "/akun";
 
   // ==========================================================================
-  // CODE WAJIB ADA
+  // 3. ERROR DARI PROVIDER
+  // ==========================================================================
+
+  if (oauthError) {
+    const loginUrl =
+      new URL(
+        "/login",
+        request.url
+      );
+
+    loginUrl.searchParams.set(
+      "error",
+      errorDescription ||
+        oauthError
+    );
+
+    console.error(
+      "[AUTH CALLBACK] OAuth provider error:",
+      {
+        oauthError,
+        errorDescription,
+      }
+    );
+
+    return NextResponse.redirect(
+      loginUrl
+    );
+  }
+
+  // ==========================================================================
+  // 4. CODE WAJIB ADA
   // ==========================================================================
 
   if (!code) {
     const loginUrl =
       new URL(
         "/login",
-        requestUrl.origin
+        request.url
       );
 
     loginUrl.searchParams.set(
@@ -71,7 +118,7 @@ export async function GET(
   }
 
   // ==========================================================================
-  // ENV
+  // 5. ENV
   // ==========================================================================
 
   const supabaseUrl =
@@ -88,98 +135,19 @@ export async function GET(
     !supabaseUrl ||
     !supabaseKey
   ) {
-    return NextResponse.redirect(
-      new URL(
-        "/login?error=supabase_config",
-        requestUrl.origin
-      )
-    );
-  }
-
-  // ==========================================================================
-  // COOKIE STORE
-  // ==========================================================================
-
-  const cookieStore =
-    await cookies();
-
-  // ==========================================================================
-  // SUPABASE SERVER CLIENT
-  // ==========================================================================
-
-  const supabase =
-    createServerClient(
-      supabaseUrl,
-      supabaseKey,
-      {
-        cookies: {
-          getAll() {
-            return cookieStore.getAll();
-          },
-
-          setAll(
-            cookiesToSet
-          ) {
-            try {
-              cookiesToSet.forEach(
-                ({
-                  name,
-                  value,
-                  options,
-                }) => {
-                  cookieStore.set(
-                    name,
-                    value,
-                    options
-                  );
-                }
-              );
-            } catch (
-              error
-            ) {
-              console.error(
-                "[AUTH CALLBACK] Cookie write error:",
-                error
-              );
-            }
-          },
-        },
-      }
-    );
-
-  // ==========================================================================
-  // EXCHANGE CODE
-  // ==========================================================================
-
-  const {
-    data,
-    error,
-  } =
-    await supabase.auth
-      .exchangeCodeForSession(
-        code
-      );
-
-  if (
-    error ||
-    !data.session ||
-    !data.user
-  ) {
     console.error(
-      "[AUTH CALLBACK] Exchange gagal:",
-      error
+      "[AUTH CALLBACK] Environment Supabase tidak lengkap."
     );
 
     const loginUrl =
       new URL(
         "/login",
-        requestUrl.origin
+        request.url
       );
 
     loginUrl.searchParams.set(
       "error",
-      error?.message ||
-        "session_not_created"
+      "supabase_config_missing"
     );
 
     return NextResponse.redirect(
@@ -188,18 +156,215 @@ export async function GET(
   }
 
   // ==========================================================================
-  // SUCCESS
+  // 6. SIAPKAN RESPONSE REDIRECT SEBELUM EXCHANGE
+  // ==========================================================================
+  //
+  // Ini penting:
+  //
+  // cookie yang dibuat oleh exchangeCodeForSession()
+  // langsung ditempel ke response yang benar-benar dikirim ke browser.
+  //
+  // ==========================================================================
+
+  const destination =
+    new URL(
+      next,
+      request.url
+    );
+
+  let response =
+    NextResponse.redirect(
+      destination
+    );
+
+  response.headers.set(
+    "Cache-Control",
+    "private, no-store, max-age=0"
+  );
+
+  response.headers.set(
+    "Pragma",
+    "no-cache"
+  );
+
+  response.headers.set(
+    "Expires",
+    "0"
+  );
+
+  // ==========================================================================
+  // 7. SUPABASE SERVER CLIENT
+  // ==========================================================================
+
+  const supabase =
+    createServerClient(
+      supabaseUrl,
+      supabaseKey,
+      {
+        cookies: {
+          // ================================================================
+          // COOKIE PKCE / CODE VERIFIER DIBACA LANGSUNG DARI REQUEST
+          // ================================================================
+
+          getAll() {
+            return request.cookies.getAll();
+          },
+
+          // ================================================================
+          // SESSION COOKIE DITEMPEL LANGSUNG KE RESPONSE REDIRECT
+          // ================================================================
+
+          setAll(
+            cookiesToSet,
+            headers
+          ) {
+            cookiesToSet.forEach(
+              ({
+                name,
+                value,
+                options,
+              }) => {
+                response.cookies.set(
+                  name,
+                  value,
+                  options
+                );
+              }
+            );
+
+            /**
+             * @supabase/ssr >= 0.10 dapat memberi cache headers
+             * saat token/session diperbarui.
+             */
+            if (headers) {
+              Object.entries(
+                headers
+              ).forEach(
+                ([
+                  key,
+                  value,
+                ]) => {
+                  response.headers.set(
+                    key,
+                    value
+                  );
+                }
+              );
+            }
+          },
+        },
+      }
+    );
+
+  // ==========================================================================
+  // 8. EXCHANGE AUTH CODE -> SESSION
+  // ==========================================================================
+
+  const {
+    data,
+    error,
+  } =
+    await supabase.auth
+      .exchangeCodeForSession(
+        code,
+        flowId
+          ? {
+              flowId,
+            }
+          : undefined
+      );
+
+  // ==========================================================================
+  // 9. EXCHANGE GAGAL
+  // ==========================================================================
+
+  if (error) {
+    console.error(
+      "[AUTH CALLBACK] exchangeCodeForSession gagal:",
+      {
+        message:
+          error.message,
+
+        flowId:
+          flowId ||
+          null,
+      }
+    );
+
+    const loginUrl =
+      new URL(
+        "/login",
+        request.url
+      );
+
+    loginUrl.searchParams.set(
+      "error",
+      error.message
+    );
+
+    return NextResponse.redirect(
+      loginUrl
+    );
+  }
+
+  // ==========================================================================
+  // 10. PASTIKAN SESSION BENAR-BENAR ADA
+  // ==========================================================================
+
+  if (
+    !data.session ||
+    !data.user
+  ) {
+    console.error(
+      "[AUTH CALLBACK] Exchange selesai tetapi session kosong."
+    );
+
+    const loginUrl =
+      new URL(
+        "/login",
+        request.url
+      );
+
+    loginUrl.searchParams.set(
+      "error",
+      "session_not_created"
+    );
+
+    return NextResponse.redirect(
+      loginUrl
+    );
+  }
+
+  // ==========================================================================
+  // 11. DEBUG AMAN
   // ==========================================================================
 
   console.log(
-    "[AUTH CALLBACK] Login berhasil:",
-    data.user.id
+    "[AUTH CALLBACK] SUCCESS",
+    {
+      userId:
+        data.user.id,
+
+      email:
+        data.user.email,
+
+      flowId:
+        flowId ||
+        null,
+
+      cookieNames:
+        response.cookies
+          .getAll()
+          .map(
+            (cookie) =>
+              cookie.name
+          ),
+    }
   );
 
-  return NextResponse.redirect(
-    new URL(
-      next,
-      requestUrl.origin
-    )
-  );
+  // ==========================================================================
+  // 12. RETURN RESPONSE YANG SUDAH MEMBAWA COOKIE SESSION
+  // ==========================================================================
+
+  return response;
 }
