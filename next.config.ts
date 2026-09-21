@@ -101,9 +101,9 @@ const nextConfig: NextConfig = {
                 "connect-src",
                 "'self'",
 
-                // Supabase
-                "https://vnneqinjvfxqkukvcyzm.supabase.co",
-                "wss://vnneqinjvfxqkukvcyzm.supabase.co",
+                // Supabase (Menggunakan wildcard agar otomatis mengizinkan semua project supabase kamu)
+                "https://*.supabase.co",
+                "wss://*.supabase.co",
 
                 // Google Analytics
                 "https://www.google-analytics.com",
