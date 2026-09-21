@@ -1,35 +1,27 @@
 // app/auth/callback/route.ts
 
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 // ============================================================================
-// GET - GOOGLE OAUTH CALLBACK
+// GOOGLE / SUPABASE OAUTH CALLBACK
 // ============================================================================
 
-export async function GET(
-  request: Request
-) {
-  const requestUrl =
-    new URL(request.url);
+export async function GET(request: Request) {
+  const requestUrl = new URL(request.url);
 
   // ==========================================================================
-  // 1. AMBIL PARAMETER CALLBACK
+  // PARAMETER
   // ==========================================================================
 
   const code =
-    requestUrl.searchParams.get(
-      "code"
-    );
+    requestUrl.searchParams.get("code");
 
-  const error =
-    requestUrl.searchParams.get(
-      "error"
-    );
+  const oauthError =
+    requestUrl.searchParams.get("error");
 
   const errorDescription =
     requestUrl.searchParams.get(
@@ -37,19 +29,12 @@ export async function GET(
     );
 
   const nextParam =
-    requestUrl.searchParams.get(
-      "next"
-    );
+    requestUrl.searchParams.get("next");
 
   // ==========================================================================
-  // 2. TENTUKAN TUJUAN SETELAH LOGIN
+  // SAFE NEXT PATH
   // ==========================================================================
 
-  /**
-   * Cegah open redirect.
-   *
-   * Hanya path internal yang diawali "/" yang diperbolehkan.
-   */
   const next =
     nextParam &&
     nextParam.startsWith("/") &&
@@ -58,14 +43,25 @@ export async function GET(
       : "/akun";
 
   // ==========================================================================
-  // 3. JIKA GOOGLE / SUPABASE MENGEMBALIKAN ERROR
+  // SUPABASE ENV
   // ==========================================================================
 
-  if (error) {
+  const supabaseUrl =
+    process.env.NEXT_PUBLIC_SUPABASE_URL;
+
+  const supabaseAnonKey =
+    process.env
+      .NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  // ==========================================================================
+  // ERROR DARI GOOGLE / SUPABASE
+  // ==========================================================================
+
+  if (oauthError) {
     console.error(
       "[AUTH CALLBACK] OAuth error:",
       {
-        error,
+        oauthError,
         errorDescription,
       }
     );
@@ -79,7 +75,7 @@ export async function GET(
     loginUrl.searchParams.set(
       "error",
       errorDescription ||
-        error
+        oauthError
     );
 
     return NextResponse.redirect(
@@ -88,12 +84,12 @@ export async function GET(
   }
 
   // ==========================================================================
-  // 4. CODE WAJIB ADA
+  // CODE WAJIB ADA
   // ==========================================================================
 
   if (!code) {
     console.error(
-      "[AUTH CALLBACK] Authorization code tidak ditemukan."
+      "[AUTH CALLBACK] Code tidak ditemukan."
     );
 
     const loginUrl =
@@ -113,23 +109,15 @@ export async function GET(
   }
 
   // ==========================================================================
-  // 5. CEK ENV SUPABASE
+  // ENV WAJIB ADA
   // ==========================================================================
-
-  const supabaseUrl =
-    process.env
-      .NEXT_PUBLIC_SUPABASE_URL;
-
-  const supabaseAnonKey =
-    process.env
-      .NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (
     !supabaseUrl ||
     !supabaseAnonKey
   ) {
     console.error(
-      "[AUTH CALLBACK] Environment Supabase belum lengkap."
+      "[AUTH CALLBACK] Environment Supabase tidak lengkap."
     );
 
     const loginUrl =
@@ -149,14 +137,28 @@ export async function GET(
   }
 
   // ==========================================================================
-  // 6. COOKIE STORE
+  // BUAT RESPONSE REDIRECT TERLEBIH DAHULU
+  // ==========================================================================
+  //
+  // Penting:
+  // cookie Supabase akan ditempel LANGSUNG
+  // ke response ini.
+  //
   // ==========================================================================
 
-  const cookieStore =
-    await cookies();
+  const destination =
+    new URL(
+      next,
+      requestUrl.origin
+    );
+
+  const response =
+    NextResponse.redirect(
+      destination
+    );
 
   // ==========================================================================
-  // 7. SUPABASE SERVER CLIENT
+  // SUPABASE SERVER CLIENT
   // ==========================================================================
 
   const supabase =
@@ -165,9 +167,40 @@ export async function GET(
       supabaseAnonKey,
       {
         cookies: {
+          // ================================================================
+          // AMBIL COOKIE DARI REQUEST
+          // ================================================================
+
           getAll() {
-            return cookieStore.getAll();
+            return request.headers
+              .get("cookie")
+              ?.split(";")
+              .map((cookie) => {
+                const [
+                  name,
+                  ...rest
+                ] =
+                  cookie
+                    .trim()
+                    .split("=");
+
+                return {
+                  name,
+                  value:
+                    rest.join("="),
+                };
+              })
+              .filter(
+                (cookie) =>
+                  Boolean(
+                    cookie.name
+                  )
+              ) || [];
           },
+
+          // ================================================================
+          // TEMPEL COOKIE KE RESPONSE REDIRECT
+          // ================================================================
 
           setAll(
             cookiesToSet
@@ -178,20 +211,11 @@ export async function GET(
                 value,
                 options,
               }) => {
-                try {
-                  cookieStore.set(
-                    name,
-                    value,
-                    options
-                  );
-                } catch (
-                  cookieError
-                ) {
-                  console.warn(
-                    "[AUTH CALLBACK] Cookie tidak dapat ditulis:",
-                    cookieError
-                  );
-                }
+                response.cookies.set(
+                  name,
+                  value,
+                  options
+                );
               }
             );
           },
@@ -200,7 +224,7 @@ export async function GET(
     );
 
   // ==========================================================================
-  // 8. EXCHANGE AUTHORIZATION CODE -> SESSION
+  // EXCHANGE CODE MENJADI SESSION
   // ==========================================================================
 
   const {
@@ -214,12 +238,12 @@ export async function GET(
       );
 
   // ==========================================================================
-  // 9. JIKA EXCHANGE GAGAL
+  // EXCHANGE GAGAL
   // ==========================================================================
 
   if (exchangeError) {
     console.error(
-      "[AUTH CALLBACK] exchangeCodeForSession gagal:",
+      "[AUTH CALLBACK] Exchange gagal:",
       exchangeError
     );
 
@@ -240,7 +264,7 @@ export async function GET(
   }
 
   // ==========================================================================
-  // 10. PASTIKAN SESSION TERBENTUK
+  // SESSION HARUS TERBENTUK
   // ==========================================================================
 
   if (
@@ -248,7 +272,7 @@ export async function GET(
     !data.user
   ) {
     console.error(
-      "[AUTH CALLBACK] Login berhasil tetapi session/user tidak terbentuk."
+      "[AUTH CALLBACK] Session tidak terbentuk."
     );
 
     const loginUrl =
@@ -268,7 +292,7 @@ export async function GET(
   }
 
   // ==========================================================================
-  // 11. LOG SUCCESS
+  // SUCCESS
   // ==========================================================================
 
   console.log(
@@ -276,14 +300,14 @@ export async function GET(
     data.user.id
   );
 
+  console.log(
+    "[AUTH CALLBACK] Redirect:",
+    destination.toString()
+  );
+
   // ==========================================================================
-  // 12. REDIRECT KE HALAMAN TUJUAN
+  // RESPONSE SUDAH MEMBAWA COOKIE SESSION
   // ==========================================================================
 
-  return NextResponse.redirect(
-    new URL(
-      next,
-      requestUrl.origin
-    )
-  );
+  return response;
 }

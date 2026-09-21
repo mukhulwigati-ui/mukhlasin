@@ -1,9 +1,8 @@
 // app/akun/page.tsx
 'use client';
 
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   History,
@@ -20,7 +19,6 @@ import {
   Loader2,
   Eye,
   ShieldCheck,
-  ArrowUpRight,
 } from 'lucide-react';
 
 export default function AkunPage() {
@@ -34,92 +32,247 @@ export default function AkunPage() {
   const [newPhone, setNewPhone] = useState('');
   const [savingPhone, setSavingPhone] = useState(false);
 
-  const supabase = useMemo(
-    () =>
-      createBrowserClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-      ),
-    []
-  );
+  const [loadError, setLoadError] = useState('');
 
-  const router = useRouter();
+  const supabase = useMemo(() => {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  useEffect(() => {
-    const fetchAkunData = async () => {
-      setLoading(true);
+    if (!url || !anonKey) {
+      throw new Error('Supabase environment variables belum tersedia.');
+    }
 
+    return createBrowserClient(url, anonKey);
+  }, []);
+
+  // ==========================================================================
+  // AUTH HELPER
+  // ==========================================================================
+
+  const getAuthenticatedUser = useCallback(async () => {
+    // Setelah OAuth callback, cookie kadang membutuhkan jeda sangat singkat
+    // sebelum terbaca sempurna oleh browser client. Jangan langsung lempar
+    // user kembali ke /login pada percobaan pertama.
+    for (let attempt = 0; attempt < 4; attempt += 1) {
       const {
-        data: { user },
-        error,
+        data: { user: verifiedUser },
+        error: userError,
       } = await supabase.auth.getUser();
 
-      if (error || !user) {
-        router.push('/login');
-        return;
+      if (verifiedUser) {
+        return verifiedUser;
       }
 
-      setUser(user);
-
-      let { data: prof } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .maybeSingle();
-
-      if (!prof) {
-        const meta = user.user_metadata || {};
-
-        prof = {
-          id: user.id,
-          email: user.email,
-          name:
-            meta.full_name ||
-            meta.name ||
-            user.email?.split('@')[0] ||
-            'Dermawan',
-          avatar: meta.avatar_url || meta.picture || '',
-          phone: '',
-        };
-
-        await supabase.from('profiles').upsert(prof);
+      if (userError) {
+        console.warn(
+          `[AKUN] getUser attempt ${attempt + 1}:`,
+          userError.message
+        );
       }
 
-      setProfile(prof);
-      setNewPhone(prof.phone || '');
+      // Fallback: cek session lokal/cookie sebelum memutuskan belum login.
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
 
-      const { data: donData } = await supabase
-        .from('donations')
-        .select('*')
-        .eq('user_id', user.id);
-
-      if (donData) {
-        setDonations(donData);
+      if (session?.user) {
+        return session.user;
       }
+
+      if (attempt < 3) {
+        await new Promise((resolve) => setTimeout(resolve, 350));
+      }
+    }
+
+    return null;
+  }, [supabase]);
+
+  // ==========================================================================
+  // SYNC FUNDRAISER SUPABASE -> SANITY
+  // ==========================================================================
+
+  const syncFundraiser = useCallback(async () => {
+    try {
+      const response = await fetch('/api/fundraiser/sync', {
+        method: 'POST',
+        cache: 'no-store',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const json = await response.json().catch(() => null);
+
+      if (!response.ok || !json?.success) {
+        console.warn('[AKUN] Fundraiser sync gagal:', json);
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error('[AKUN] Fundraiser sync error:', error);
+      return false;
+    }
+  }, []);
+
+  // ==========================================================================
+  // LOAD ACCOUNT
+  // ==========================================================================
+
+  useEffect(() => {
+    let active = true;
+
+    const fetchAkunData = async () => {
+      setLoading(true);
+      setLoadError('');
 
       try {
-        const phoneKey = prof?.phone || user.id;
+        const authenticatedUser = await getAuthenticatedUser();
 
-        const { count, error: countErr } = await supabase
-          .from('referral_visits')
-          .select('*', {
-            count: 'exact',
-            head: true,
-          })
-          .eq('ref_code', phoneKey);
+        if (!active) return;
 
-        if (!countErr && count !== null) {
-          setReferralClicks(count);
+        if (!authenticatedUser) {
+          window.location.replace('/login');
+          return;
         }
-      } catch (err) {
-        console.log('Belum ada tabel pelacakan referral.');
-      }
 
-      setLoading(false);
+        setUser(authenticatedUser);
+
+        const {
+          data: existingProfile,
+          error: profileReadError,
+        } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', authenticatedUser.id)
+          .maybeSingle();
+
+        if (profileReadError) {
+          console.error('[AKUN] Gagal membaca profile:', profileReadError);
+        }
+
+        let prof = existingProfile;
+
+        // Jika akun Google baru belum mempunyai baris profiles, buat otomatis.
+        if (!prof) {
+          const meta = authenticatedUser.user_metadata || {};
+
+          const profileToCreate = {
+            id: authenticatedUser.id,
+            email: authenticatedUser.email || '',
+            name:
+              meta.full_name ||
+              meta.name ||
+              authenticatedUser.email?.split('@')[0] ||
+              'Dermawan',
+            avatar: meta.avatar_url || meta.picture || '',
+            phone: '',
+            updated_at: new Date().toISOString(),
+          };
+
+          const {
+            data: createdProfile,
+            error: profileCreateError,
+          } = await supabase
+            .from('profiles')
+            .upsert(profileToCreate, { onConflict: 'id' })
+            .select('*')
+            .maybeSingle();
+
+          if (profileCreateError) {
+            console.error(
+              '[AKUN] Gagal membuat profile:',
+              profileCreateError
+            );
+
+            // UI tetap dapat digunakan menggunakan metadata Google.
+            prof = profileToCreate;
+          } else {
+            prof = createdProfile || profileToCreate;
+          }
+        }
+
+        if (!active) return;
+
+        setProfile(prof);
+        setNewPhone(prof?.phone || '');
+
+        // Bila nomor WA sudah tersedia, pastikan relawan/fundraiser ada di Sanity.
+        if (prof?.phone) {
+          await syncFundraiser();
+        }
+
+        // ================================================================
+        // DONATION HISTORY
+        // ================================================================
+
+        const {
+          data: donData,
+          error: donationError,
+        } = await supabase
+          .from('donations')
+          .select('*')
+          .eq('user_id', authenticatedUser.id);
+
+        if (donationError) {
+          console.warn('[AKUN] Gagal membaca donations:', donationError.message);
+        } else if (active && donData) {
+          setDonations(donData);
+        }
+
+        // ================================================================
+        // REFERRAL VISITS
+        // ================================================================
+
+        try {
+          const phoneKey = prof?.phone || authenticatedUser.id;
+
+          const { count, error: countErr } = await supabase
+            .from('referral_visits')
+            .select('*', {
+              count: 'exact',
+              head: true,
+            })
+            .eq('ref_code', phoneKey);
+
+          if (!countErr && count !== null && active) {
+            setReferralClicks(count);
+          }
+        } catch {
+          console.log('[AKUN] Belum ada tabel pelacakan referral.');
+        }
+      } catch (error) {
+        console.error('[AKUN] Load error:', error);
+
+        if (active) {
+          setLoadError('Data akun gagal dimuat. Silakan muat ulang halaman.');
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
     };
 
     fetchAkunData();
-  }, [supabase, router]);
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT') {
+        window.location.replace('/login');
+      }
+
+      if (event === 'SIGNED_IN' && session?.user) {
+        setUser(session.user);
+      }
+    });
+
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+    };
+  }, [supabase, getAuthenticatedUser, syncFundraiser]);
 
   const successfulDonations = donations.filter((d) =>
     ['success', 'paid', 'completed'].includes(
@@ -187,9 +340,14 @@ export default function AkunPage() {
   ) => {
     e.preventDefault();
 
+    if (!user?.id) {
+      window.location.replace('/login');
+      return;
+    }
+
     const clean = newPhone.replace(/[^0-9]/g, '');
 
-    if (clean.length < 9) {
+    if (clean.length < 9 || clean.length > 15) {
       alert('Masukkan nomor WhatsApp yang valid!');
       return;
     }
@@ -197,13 +355,30 @@ export default function AkunPage() {
     setSavingPhone(true);
 
     try {
+      // Upsert lebih aman daripada update: bila profile belum sempat dibuat,
+      // nomor WhatsApp tetap tersimpan.
       const { error } = await supabase
         .from('profiles')
-        .update({
-          phone: clean,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', user.id);
+        .upsert(
+          {
+            id: user.id,
+            email: profile?.email || user.email || '',
+            name:
+              profile?.name ||
+              user.user_metadata?.full_name ||
+              user.user_metadata?.name ||
+              user.email?.split('@')[0] ||
+              'Dermawan',
+            avatar:
+              profile?.avatar ||
+              user.user_metadata?.avatar_url ||
+              user.user_metadata?.picture ||
+              '',
+            phone: clean,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'id' }
+        );
 
       if (error) {
         throw error;
@@ -214,21 +389,40 @@ export default function AkunPage() {
         phone: clean,
       }));
 
+      setNewPhone(clean);
+
+      // Nomor WhatsApp = aktivasi fundraiser.
+      const synced = await syncFundraiser();
+
       setIsModalOpen(false);
 
-      alert('Nomor WhatsApp berhasil diperbarui!');
-    } catch (err: any) {
-      alert('Gagal memperbarui: ' + err.message);
+      if (synced) {
+        alert(
+          'Nomor WhatsApp berhasil diperbarui dan akun fundraiser sudah disinkronkan.'
+        );
+      } else {
+        alert(
+          'Nomor WhatsApp berhasil diperbarui. Sinkronisasi fundraiser akan dicoba kembali saat halaman referral dibuka.'
+        );
+      }
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : 'Terjadi kesalahan.';
+
+      alert('Gagal memperbarui: ' + message);
     } finally {
       setSavingPhone(false);
     }
   };
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    setLoading(true);
 
-    router.push('/login');
-    router.refresh();
+    try {
+      await supabase.auth.signOut();
+    } finally {
+      window.location.replace('/login');
+    }
   };
 
   if (loading) {
@@ -242,6 +436,24 @@ export default function AkunPage() {
           <span className="text-[9px] font-bold uppercase tracking-[0.22em] text-slate-400">
             Memuat akun
           </span>
+        </div>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="min-h-screen bg-[#f8f8f6] flex items-center justify-center px-4">
+        <div className="w-full max-w-sm rounded-2xl border border-red-100 bg-white p-6 text-center shadow-sm">
+          <p className="text-sm font-bold text-slate-800">Akun belum dapat dimuat</p>
+          <p className="mt-2 text-xs leading-relaxed text-slate-500">{loadError}</p>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="mt-5 w-full rounded-xl bg-[#102a43] px-4 py-3 text-xs font-bold text-white"
+          >
+            Muat Ulang
+          </button>
         </div>
       </div>
     );
@@ -282,7 +494,7 @@ export default function AkunPage() {
               </p>
 
               <h1 className="mt-1 text-[17px] font-bold text-white truncate">
-                {profile?.name || 'Dermawan Islami'}
+                {profile?.name || 'Dermawan Mukhlasin'}
               </h1>
 
               <p className="mt-0.5 text-[10px] text-slate-300 truncate">
@@ -293,7 +505,7 @@ export default function AkunPage() {
                 <ShieldCheck className="w-3 h-3 text-[#d7b66a]" />
 
                 <span className="text-[8px] font-semibold uppercase tracking-wider text-[#e7d5a4]">
-                  Member Islami.or.id
+                  Member Mukhlasin.or.id
                 </span>
               </div>
             </div>
@@ -561,11 +773,11 @@ export default function AkunPage() {
 
                 <div>
                   <span className="text-[11px] font-semibold text-slate-700 block">
-                    Ajak Teman
+                    Fundraiser & Komisi
                   </span>
 
                   <span className="text-[8px] text-slate-400">
-                    Program referral & kebaikan
+                    Referral, performa & pencairan komisi
                   </span>
                 </div>
 
