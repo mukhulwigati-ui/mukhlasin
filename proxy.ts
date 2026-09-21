@@ -2,7 +2,6 @@
 
 import {
   createServerClient,
-  type CookieOptions,
 } from "@supabase/ssr";
 
 import {
@@ -11,38 +10,40 @@ import {
 } from "next/server";
 
 // ============================================================================
-// TYPE COOKIE YANG AKAN DIKIRIM KE BROWSER
+// COPY COOKIE + CACHE HEADER KE RESPONSE BARU
 // ============================================================================
 
-type PendingCookie = {
-  name: string;
-  value: string;
-  options?: CookieOptions;
-};
-
-// ============================================================================
-// HELPER: PASANG COOKIE SUPABASE KE RESPONSE
-// ============================================================================
-
-function applyCookies(
-  response: NextResponse,
-  cookies: PendingCookie[]
+function copySupabaseState(
+  source: NextResponse,
+  target: NextResponse
 ) {
-  cookies.forEach(
-    ({
-      name,
-      value,
-      options,
-    }) => {
-      response.cookies.set(
-        name,
-        value,
-        options
+  // Copy semua cookie Supabase
+  source.cookies
+    .getAll()
+    .forEach((cookie) => {
+      target.cookies.set(cookie);
+    });
+
+  // Copy header penting dari Supabase SSR
+  [
+    "cache-control",
+    "expires",
+    "pragma",
+  ].forEach((headerName) => {
+    const value =
+      source.headers.get(
+        headerName
+      );
+
+    if (value) {
+      target.headers.set(
+        headerName,
+        value
       );
     }
-  );
+  });
 
-  return response;
+  return target;
 }
 
 // ============================================================================
@@ -52,98 +53,60 @@ function applyCookies(
 export async function proxy(
   request: NextRequest
 ) {
-  const pathname =
-    request.nextUrl.pathname;
+  let supabaseResponse =
+    NextResponse.next({
+      request,
+    });
 
   // ==========================================================================
-  // 1. ENV SUPABASE
+  // ENV
   // ==========================================================================
 
   const supabaseUrl =
     process.env
       .NEXT_PUBLIC_SUPABASE_URL;
 
-  const supabaseAnonKey =
+  const supabaseKey =
+    process.env
+      .NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
     process.env
       .NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  // ==========================================================================
-  // 2. RESPONSE DASAR
-  // ==========================================================================
-
-  let response =
-    NextResponse.next({
-      request,
-    });
-
-  // ==========================================================================
-  // 3. JANGAN PAKAI PLACEHOLDER URL / KEY
-  // ==========================================================================
-
   if (
     !supabaseUrl ||
-    !supabaseAnonKey
+    !supabaseKey
   ) {
     console.error(
-      "[PROXY] Environment Supabase belum lengkap."
+      "[PROXY] Supabase environment belum lengkap."
     );
 
-    /**
-     * Jangan mencoba menghubungi:
-     *
-     * placeholder-project.supabase.co
-     *
-     * karena itu justru menyebabkan perilaku auth
-     * yang membingungkan.
-     */
-    return response;
+    return supabaseResponse;
   }
 
   // ==========================================================================
-  // 4. PENAMPUNG COOKIE BARU
-  // ==========================================================================
-
-  const pendingCookies:
-    PendingCookie[] = [];
-
-  // ==========================================================================
-  // 5. SUPABASE SERVER CLIENT
+  // SUPABASE CLIENT
   // ==========================================================================
 
   const supabase =
     createServerClient(
       supabaseUrl,
-      supabaseAnonKey,
+      supabaseKey,
       {
         cookies: {
-          // ================================================================
-          // BACA SEMUA COOKIE
-          // ================================================================
-
           getAll() {
             return request.cookies.getAll();
           },
 
-          // ================================================================
-          // UPDATE COOKIE
-          // ================================================================
-
           setAll(
-            cookiesToSet
+            cookiesToSet,
+            headers?: Record<
+              string,
+              string
+            >
           ) {
-            // --------------------------------------------------------------
-            // Simpan untuk response akhir / redirect
-            // --------------------------------------------------------------
-
-            pendingCookies.splice(
-              0,
-              pendingCookies.length,
-              ...cookiesToSet
-            );
-
-            // --------------------------------------------------------------
-            // Update request
-            // --------------------------------------------------------------
+            // ================================================================
+            // UPDATE COOKIE REQUEST
+            // ================================================================
 
             cookiesToSet.forEach(
               ({
@@ -157,18 +120,18 @@ export async function proxy(
               }
             );
 
-            // --------------------------------------------------------------
-            // Response baru berdasarkan request terbaru
-            // --------------------------------------------------------------
+            // ================================================================
+            // BUAT RESPONSE BARU
+            // ================================================================
 
-            response =
+            supabaseResponse =
               NextResponse.next({
                 request,
               });
 
-            // --------------------------------------------------------------
-            // Kirim cookie terbaru ke browser
-            // --------------------------------------------------------------
+            // ================================================================
+            // COOKIE KE BROWSER
+            // ================================================================
 
             cookiesToSet.forEach(
               ({
@@ -176,66 +139,71 @@ export async function proxy(
                 value,
                 options,
               }) => {
-                response.cookies.set(
+                supabaseResponse.cookies.set(
                   name,
                   value,
                   options
                 );
               }
             );
+
+            // ================================================================
+            // CACHE HEADERS DARI SUPABASE SSR
+            // ================================================================
+
+            if (headers) {
+              Object.entries(
+                headers
+              ).forEach(
+                ([
+                  key,
+                  value,
+                ]) => {
+                  supabaseResponse.headers.set(
+                    key,
+                    value
+                  );
+                }
+              );
+            }
           },
         },
       }
     );
 
   // ==========================================================================
-  // 6. CEK USER
+  // PENTING:
+  // Jangan jalankan kode lain antara createServerClient dan getUser()
   // ==========================================================================
 
-  let user = null;
+  const {
+    data: {
+      user,
+    },
+  } =
+    await supabase.auth.getUser();
 
-  try {
-    const {
-      data,
-      error,
-    } =
-      await supabase.auth.getUser();
+  // ==========================================================================
+  // PATH
+  // ==========================================================================
 
-    if (error) {
-      /**
-       * Tidak perlu dianggap fatal.
-       *
-       * Kalau memang belum login,
-       * user akan null.
-       */
-      console.warn(
-        "[PROXY] Supabase auth:",
-        error.message
-      );
-    }
+  const pathname =
+    request.nextUrl.pathname;
 
-    user =
-      data?.user ?? null;
-  } catch (
-    error
+  // ==========================================================================
+  // CALLBACK AUTH HARUS DIBIARKAN
+  // ==========================================================================
+
+  if (
+    pathname.startsWith(
+      "/auth/"
+    )
   ) {
-    console.error(
-      "[PROXY] getUser error:",
-      error
-    );
-
-    user = null;
+    return supabaseResponse;
   }
 
   // ==========================================================================
-  // 7. ROUTE LOGIN
-  // ==========================================================================
-
-  const isLoginPage =
-    pathname === "/login";
-
-  // ==========================================================================
-  // 8. ROUTE YANG WAJIB LOGIN
+  // PROTECTED ROUTES
   // ==========================================================================
 
   const protectedRoutes = [
@@ -257,112 +225,77 @@ export async function proxy(
     );
 
   // ==========================================================================
-  // 9. SUDAH LOGIN TAPI MASIH MEMBUKA /login
+  // SUDAH LOGIN TAPI MEMBUKA LOGIN
   // ==========================================================================
 
   if (
     user &&
-    isLoginPage
+    pathname === "/login"
   ) {
-    const redirectUrl =
+    const url =
       request.nextUrl.clone();
 
-    redirectUrl.pathname =
+    url.pathname =
       "/akun";
 
-    redirectUrl.search = "";
+    url.search = "";
 
     const redirectResponse =
       NextResponse.redirect(
-        redirectUrl
+        url
       );
 
-    /**
-     * Sangat penting:
-     *
-     * Jika getUser() tadi memperbarui token,
-     * cookie baru harus ikut response redirect.
-     */
-    return applyCookies(
-      redirectResponse,
-      pendingCookies
+    return copySupabaseState(
+      supabaseResponse,
+      redirectResponse
     );
   }
 
   // ==========================================================================
-  // 10. BELUM LOGIN TAPI MASUK HALAMAN PRIVATE
+  // BELUM LOGIN MEMBUKA PRIVATE PAGE
   // ==========================================================================
 
   if (
     !user &&
     isProtectedRoute
   ) {
-    const loginUrl =
+    const url =
       request.nextUrl.clone();
 
-    loginUrl.pathname =
+    url.pathname =
       "/login";
 
-    loginUrl.search = "";
+    url.search = "";
 
-    // ========================================================================
-    // SIMPAN TUJUAN ASLI
-    // ========================================================================
-
-    loginUrl.searchParams.set(
+    url.searchParams.set(
       "next",
-      `${pathname}${request.nextUrl.search}`
+      pathname
     );
 
     const redirectResponse =
       NextResponse.redirect(
-        loginUrl
+        url
       );
 
-    return applyCookies(
-      redirectResponse,
-      pendingCookies
+    return copySupabaseState(
+      supabaseResponse,
+      redirectResponse
     );
   }
 
   // ==========================================================================
-  // 11. NORMAL RESPONSE
+  // RESPONSE NORMAL
   // ==========================================================================
 
-  return response;
+  return supabaseResponse;
 }
 
 // ============================================================================
 // MATCHER
 // ============================================================================
-//
-// Sengaja hanya menjalankan auth proxy pada route yang membutuhkan.
-//
-// /auth/callback TIDAK perlu diproses proxy,
-// karena callback sudah menjalankan exchangeCodeForSession() sendiri.
-//
-// ============================================================================
 
 export const config = {
   matcher: [
-    "/login",
-
-    "/akun",
-    "/akun/:path*",
-
-    "/donasi-saya",
-    "/donasi-saya/:path*",
-
-    "/pengaturan",
-    "/pengaturan/:path*",
-
-    "/kuitansi",
-    "/kuitansi/:path*",
-
-    "/favorit",
-    "/favorit/:path*",
-
-    "/referral",
-    "/referral/:path*",
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|map|woff|woff2|ttf)$).*)",
   ],
 };

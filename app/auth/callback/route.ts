@@ -1,38 +1,45 @@
 // app/auth/callback/route.ts
 
-import { NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
+import {
+  NextResponse,
+} from "next/server";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+import {
+  cookies,
+} from "next/headers";
+
+import {
+  createServerClient,
+} from "@supabase/ssr";
+
+export const dynamic =
+  "force-dynamic";
+
+export const revalidate =
+  0;
 
 // ============================================================================
-// GOOGLE / SUPABASE OAUTH CALLBACK
+// AUTH CALLBACK
 // ============================================================================
 
-export async function GET(request: Request) {
-  const requestUrl = new URL(request.url);
-
-  // ==========================================================================
-  // PARAMETER
-  // ==========================================================================
+export async function GET(
+  request: Request
+) {
+  const requestUrl =
+    new URL(request.url);
 
   const code =
-    requestUrl.searchParams.get("code");
-
-  const oauthError =
-    requestUrl.searchParams.get("error");
-
-  const errorDescription =
     requestUrl.searchParams.get(
-      "error_description"
+      "code"
     );
 
   const nextParam =
-    requestUrl.searchParams.get("next");
+    requestUrl.searchParams.get(
+      "next"
+    );
 
   // ==========================================================================
-  // SAFE NEXT PATH
+  // SAFE REDIRECT
   // ==========================================================================
 
   const next =
@@ -43,55 +50,10 @@ export async function GET(request: Request) {
       : "/akun";
 
   // ==========================================================================
-  // SUPABASE ENV
-  // ==========================================================================
-
-  const supabaseUrl =
-    process.env.NEXT_PUBLIC_SUPABASE_URL;
-
-  const supabaseAnonKey =
-    process.env
-      .NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  // ==========================================================================
-  // ERROR DARI GOOGLE / SUPABASE
-  // ==========================================================================
-
-  if (oauthError) {
-    console.error(
-      "[AUTH CALLBACK] OAuth error:",
-      {
-        oauthError,
-        errorDescription,
-      }
-    );
-
-    const loginUrl =
-      new URL(
-        "/login",
-        requestUrl.origin
-      );
-
-    loginUrl.searchParams.set(
-      "error",
-      errorDescription ||
-        oauthError
-    );
-
-    return NextResponse.redirect(
-      loginUrl
-    );
-  }
-
-  // ==========================================================================
   // CODE WAJIB ADA
   // ==========================================================================
 
   if (!code) {
-    console.error(
-      "[AUTH CALLBACK] Code tidak ditemukan."
-    );
-
     const loginUrl =
       new URL(
         "/login",
@@ -109,53 +71,37 @@ export async function GET(request: Request) {
   }
 
   // ==========================================================================
-  // ENV WAJIB ADA
+  // ENV
   // ==========================================================================
+
+  const supabaseUrl =
+    process.env
+      .NEXT_PUBLIC_SUPABASE_URL;
+
+  const supabaseKey =
+    process.env
+      .NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+    process.env
+      .NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (
     !supabaseUrl ||
-    !supabaseAnonKey
+    !supabaseKey
   ) {
-    console.error(
-      "[AUTH CALLBACK] Environment Supabase tidak lengkap."
-    );
-
-    const loginUrl =
-      new URL(
-        "/login",
-        requestUrl.origin
-      );
-
-    loginUrl.searchParams.set(
-      "error",
-      "supabase_config_missing"
-    );
-
     return NextResponse.redirect(
-      loginUrl
+      new URL(
+        "/login?error=supabase_config",
+        requestUrl.origin
+      )
     );
   }
 
   // ==========================================================================
-  // BUAT RESPONSE REDIRECT TERLEBIH DAHULU
-  // ==========================================================================
-  //
-  // Penting:
-  // cookie Supabase akan ditempel LANGSUNG
-  // ke response ini.
-  //
+  // COOKIE STORE
   // ==========================================================================
 
-  const destination =
-    new URL(
-      next,
-      requestUrl.origin
-    );
-
-  const response =
-    NextResponse.redirect(
-      destination
-    );
+  const cookieStore =
+    await cookies();
 
   // ==========================================================================
   // SUPABASE SERVER CLIENT
@@ -164,115 +110,64 @@ export async function GET(request: Request) {
   const supabase =
     createServerClient(
       supabaseUrl,
-      supabaseAnonKey,
+      supabaseKey,
       {
         cookies: {
-          // ================================================================
-          // AMBIL COOKIE DARI REQUEST
-          // ================================================================
-
           getAll() {
-            return request.headers
-              .get("cookie")
-              ?.split(";")
-              .map((cookie) => {
-                const [
-                  name,
-                  ...rest
-                ] =
-                  cookie
-                    .trim()
-                    .split("=");
-
-                return {
-                  name,
-                  value:
-                    rest.join("="),
-                };
-              })
-              .filter(
-                (cookie) =>
-                  Boolean(
-                    cookie.name
-                  )
-              ) || [];
+            return cookieStore.getAll();
           },
-
-          // ================================================================
-          // TEMPEL COOKIE KE RESPONSE REDIRECT
-          // ================================================================
 
           setAll(
             cookiesToSet
           ) {
-            cookiesToSet.forEach(
-              ({
-                name,
-                value,
-                options,
-              }) => {
-                response.cookies.set(
+            try {
+              cookiesToSet.forEach(
+                ({
                   name,
                   value,
-                  options
-                );
-              }
-            );
+                  options,
+                }) => {
+                  cookieStore.set(
+                    name,
+                    value,
+                    options
+                  );
+                }
+              );
+            } catch (
+              error
+            ) {
+              console.error(
+                "[AUTH CALLBACK] Cookie write error:",
+                error
+              );
+            }
           },
         },
       }
     );
 
   // ==========================================================================
-  // EXCHANGE CODE MENJADI SESSION
+  // EXCHANGE CODE
   // ==========================================================================
 
   const {
     data,
-    error:
-      exchangeError,
+    error,
   } =
     await supabase.auth
       .exchangeCodeForSession(
         code
       );
 
-  // ==========================================================================
-  // EXCHANGE GAGAL
-  // ==========================================================================
-
-  if (exchangeError) {
-    console.error(
-      "[AUTH CALLBACK] Exchange gagal:",
-      exchangeError
-    );
-
-    const loginUrl =
-      new URL(
-        "/login",
-        requestUrl.origin
-      );
-
-    loginUrl.searchParams.set(
-      "error",
-      exchangeError.message
-    );
-
-    return NextResponse.redirect(
-      loginUrl
-    );
-  }
-
-  // ==========================================================================
-  // SESSION HARUS TERBENTUK
-  // ==========================================================================
-
   if (
+    error ||
     !data.session ||
     !data.user
   ) {
     console.error(
-      "[AUTH CALLBACK] Session tidak terbentuk."
+      "[AUTH CALLBACK] Exchange gagal:",
+      error
     );
 
     const loginUrl =
@@ -283,7 +178,8 @@ export async function GET(request: Request) {
 
     loginUrl.searchParams.set(
       "error",
-      "session_not_created"
+      error?.message ||
+        "session_not_created"
     );
 
     return NextResponse.redirect(
@@ -300,14 +196,10 @@ export async function GET(request: Request) {
     data.user.id
   );
 
-  console.log(
-    "[AUTH CALLBACK] Redirect:",
-    destination.toString()
+  return NextResponse.redirect(
+    new URL(
+      next,
+      requestUrl.origin
+    )
   );
-
-  // ==========================================================================
-  // RESPONSE SUDAH MEMBAWA COOKIE SESSION
-  // ==========================================================================
-
-  return response;
 }
