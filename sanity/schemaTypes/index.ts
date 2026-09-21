@@ -1,18 +1,74 @@
 // schemas/index.ts
-import program from './program';           // File skema program donasi Anda
-import news from './news';                  // Skema kabar berita
-import category from './category';          // Skema kategori artikel/berita
-import donationTransaction from './donationTransaction'; // Penampung data transaksi pending (Nama & WA)
-import laporan from './laporan';           // Skema laporan yayasan
-import fundraiser from './fundraiser';      // Skema pendaftaran fundraiser
-import heroBanner from './slider';          // 🚀 Skema hero banner slider
+
+// =========================================================
+// PROGRAM & KONTEN
+// =========================================================
+
+import program from './program';
+import news from './news';
+import category from './category';
+import donationTransaction from './donationTransaction';
+import laporan from './laporan';
+import heroBanner from './slider';
+
+// =========================================================
+// FUNDRAISER
+// =========================================================
+
+// Data profil / pendaftaran fundraiser
+import fundraiser from './fundraiser';
+
+// Data pengajuan & riwayat penarikan komisi fundraiser
+import fundraiserWithdrawal from './fundraiserWithdrawal';
+
+// =========================================================
+// DAFTAR SELURUH SCHEMA
+// =========================================================
 
 export const schemaTypes = [
+  // =======================================================
+  // PROGRAM DONASI
+  // =======================================================
+
   program,
-  laporan, 
-  category, 
-  news,      
+
+  // =======================================================
+  // LAPORAN
+  // =======================================================
+
+  laporan,
+
+  // =======================================================
+  // KATEGORI
+  // =======================================================
+
+  category,
+
+  // =======================================================
+  // BERITA / ARTIKEL
+  // =======================================================
+
+  news,
+
+  // =======================================================
+  // TRANSAKSI DONASI
+  // =======================================================
+
   donationTransaction,
+
+  // =======================================================
+  // FUNDRAISER
+  // =======================================================
+
+  // Pendaftaran / profil fundraiser
   fundraiser,
-  heroBanner, // 🚀 Didaftarkan ke dalam array agar aktif di Sanity Studio
+
+  // Pengajuan & riwayat pencairan komisi
+  fundraiserWithdrawal,
+
+  // =======================================================
+  // HERO BANNER / SLIDER
+  // =======================================================
+
+  heroBanner,
 ];
