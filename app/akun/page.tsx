@@ -350,8 +350,9 @@ export default function AkunPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#f8f8f6] flex items-center justify-center max-w-[480px] mx-auto w-full">
-        <div className="flex flex-col items-center gap-4">
+      <div className="min-h-screen bg-[#f8f8f6] flex items-center justify-center w-full">
+        {/* Menggunakan penyesuaian lebar container selaras dengan BottomNav */}
+        <div className="w-[calc(100%-1.5rem)] max-w-[calc(28rem-1.5rem)] flex flex-col items-center gap-4">
           <div className="w-11 h-11 rounded-2xl bg-[#102a43] flex items-center justify-center shadow-lg">
             <Loader2 className="w-5 h-5 text-white animate-spin" />
           </div>
@@ -365,8 +366,8 @@ export default function AkunPage() {
 
   if (loadError) {
     return (
-      <div className="min-h-screen bg-[#f8f8f6] flex items-center justify-center px-4 max-w-[480px] mx-auto w-full">
-        <div className="w-full rounded-none border border-red-100 bg-white p-6 text-center shadow-sm">
+      <div className="min-h-screen bg-[#f8f8f6] flex items-center justify-center w-full px-4">
+        <div className="w-[calc(100%-1.5rem)] max-w-[calc(28rem-1.5rem)] rounded-none border border-red-100 bg-white p-6 text-center shadow-sm">
           <p className="text-sm font-bold text-slate-800">Akun belum dapat dimuat</p>
           <p className="mt-2 text-xs leading-relaxed text-slate-500">{loadError}</p>
           <button
@@ -382,7 +383,8 @@ export default function AkunPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f8f8f6] text-slate-900 pb-32 pt-2 px-4 max-w-[480px] mx-auto w-full shadow-sm">
+    // DISINI PERUBAHAN UTAMANYA: Menggunakan class max-w dan margin yang konsisten dengan BottomNav
+    <div className="min-h-screen bg-[#f8f8f6] text-slate-900 pb-32 pt-2 mx-auto w-[calc(100%-1.5rem)] max-w-[calc(28rem-1.5rem)] shadow-sm">
       <div className="w-full space-y-3">
 
         {/* =========================================================
