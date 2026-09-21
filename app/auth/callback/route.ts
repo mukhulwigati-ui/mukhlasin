@@ -9,157 +9,180 @@ import {
   createServerClient,
 } from "@supabase/ssr";
 
-export const dynamic =
-  "force-dynamic";
-
-export const revalidate =
-  0;
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 // ============================================================================
-// GOOGLE / SUPABASE AUTH CALLBACK
+// COPY COOKIES DARI SATU RESPONSE KE RESPONSE LAIN
+// ============================================================================
+
+function copyResponseCookies(
+  source: NextResponse,
+  target: NextResponse
+) {
+  source.cookies
+    .getAll()
+    .forEach((cookie) => {
+      target.cookies.set(cookie);
+    });
+
+  return target;
+}
+
+// ============================================================================
+// CALLBACK
 // ============================================================================
 
 export async function GET(
   request: NextRequest
 ) {
-  const requestUrl =
-    request.nextUrl.clone();
-
   // ==========================================================================
   // PARAMETER
   // ==========================================================================
 
+  const url =
+    request.nextUrl.clone();
+
   const code =
-    requestUrl.searchParams.get(
+    url.searchParams.get(
       "code"
     );
 
-  /**
-   * INI YANG SEBELUMNYA HILANG.
-   *
-   * Contoh:
-   *
-   * sb_flow_id=a3c4cc5ada35a629bee622ebcb2f3b8e
-   */
   const flowId =
-    requestUrl.searchParams.get(
+    url.searchParams.get(
       "sb_flow_id"
     );
 
-  const oauthError =
-    requestUrl.searchParams.get(
+  const providerError =
+    url.searchParams.get(
       "error"
     );
 
   const errorDescription =
-    requestUrl.searchParams.get(
+    url.searchParams.get(
       "error_description"
     );
 
   // ==========================================================================
-  // DEBUG
+  // COOKIE YANG DATANG KE CALLBACK
   // ==========================================================================
 
+  const requestCookies =
+    request.cookies.getAll();
+
+  const cookieNames =
+    requestCookies.map(
+      (cookie) =>
+        cookie.name
+    );
+
+  const supabaseCookieNames =
+    cookieNames.filter(
+      (name) =>
+        name.startsWith(
+          "sb-"
+        )
+    );
+
+  // ==========================================================================
+  // COOKIE VERIFIER YANG SEHARUSNYA DIPAKAI
+  // ==========================================================================
+
+  const expectedFlowCookiePart =
+    flowId
+      ? `-flow-${flowId}-code-verifier`
+      : null;
+
+  const matchingVerifier =
+    expectedFlowCookiePart
+      ? supabaseCookieNames.find(
+          (name) =>
+            name.endsWith(
+              expectedFlowCookiePart
+            )
+        )
+      : undefined;
+
   console.log(
-    "[AUTH CALLBACK] Request:",
+    "[AUTH CALLBACK] MASUK:",
     {
       hasCode:
         Boolean(code),
 
       flowId:
-        flowId ||
-        null,
+        flowId || null,
 
-      url:
-        requestUrl.pathname,
+      hasMatchingVerifier:
+        Boolean(
+          matchingVerifier
+        ),
 
-      cookieNames:
-        request.cookies
-          .getAll()
-          .map(
-            (cookie) =>
-              cookie.name
-          ),
+      supabaseCookieNames,
     }
   );
 
   // ==========================================================================
-  // OAUTH ERROR
+  // ERROR DARI PROVIDER
   // ==========================================================================
 
-  if (oauthError) {
-    console.error(
-      "[AUTH CALLBACK] Provider error:",
+  if (providerError) {
+    return NextResponse.json(
       {
-        oauthError,
-        errorDescription,
+        success: false,
+
+        stage:
+          "provider",
+
+        error:
+          providerError,
+
+        errorDescription:
+          errorDescription ||
+          null,
+
+        flowId:
+          flowId ||
+          null,
+
+        cookies:
+          supabaseCookieNames,
+      },
+      {
+        status: 400,
       }
-    );
-
-    const loginUrl =
-      new URL(
-        "/login",
-        request.url
-      );
-
-    loginUrl.searchParams.set(
-      "error",
-      errorDescription ||
-        oauthError
-    );
-
-    return NextResponse.redirect(
-      loginUrl
     );
   }
 
   // ==========================================================================
-  // CODE WAJIB ADA
+  // CODE TIDAK ADA
   // ==========================================================================
 
   if (!code) {
-    console.error(
-      "[AUTH CALLBACK] Code tidak ditemukan."
-    );
+    return NextResponse.json(
+      {
+        success: false,
 
-    const loginUrl =
-      new URL(
-        "/login",
-        request.url
-      );
+        stage:
+          "callback",
 
-    loginUrl.searchParams.set(
-      "error",
-      "missing_code"
-    );
+        error:
+          "Authorization code tidak ditemukan.",
 
-    return NextResponse.redirect(
-      loginUrl
-    );
-  }
+        flowId:
+          flowId ||
+          null,
 
-  // ==========================================================================
-  // FLOW ID WAJIB ADA
-  // ==========================================================================
+        hasMatchingVerifier:
+          Boolean(
+            matchingVerifier
+          ),
 
-  if (!flowId) {
-    console.error(
-      "[AUTH CALLBACK] sb_flow_id tidak ditemukan."
-    );
-
-    const loginUrl =
-      new URL(
-        "/login",
-        request.url
-      );
-
-    loginUrl.searchParams.set(
-      "error",
-      "missing_flow_id"
-    );
-
-    return NextResponse.redirect(
-      loginUrl
+        cookies:
+          supabaseCookieNames,
+      },
+      {
+        status: 400,
+      }
     );
   }
 
@@ -181,20 +204,34 @@ export async function GET(
     !supabaseUrl ||
     !supabaseKey
   ) {
-    console.error(
-      "[AUTH CALLBACK] Supabase ENV tidak lengkap."
-    );
+    return NextResponse.json(
+      {
+        success: false,
 
-    return NextResponse.redirect(
-      new URL(
-        "/login?error=supabase_config_missing",
-        request.url
-      )
+        stage:
+          "environment",
+
+        error:
+          "Environment Supabase belum lengkap.",
+
+        hasUrl:
+          Boolean(
+            supabaseUrl
+          ),
+
+        hasKey:
+          Boolean(
+            supabaseKey
+          ),
+      },
+      {
+        status: 500,
+      }
     );
   }
 
   // ==========================================================================
-  // DESTINATION
+  // RESPONSE SUCCESS
   // ==========================================================================
 
   const destination =
@@ -203,18 +240,14 @@ export async function GET(
       request.url
     );
 
-  // ==========================================================================
-  // RESPONSE
-  // ==========================================================================
-
-  const response =
+  let response =
     NextResponse.redirect(
       destination
     );
 
   response.headers.set(
     "Cache-Control",
-    "private, no-store, max-age=0, must-revalidate"
+    "private, no-store, max-age=0"
   );
 
   response.headers.set(
@@ -237,21 +270,12 @@ export async function GET(
       supabaseKey,
       {
         cookies: {
-          // ================================================================
-          // BACA VERIFIER DARI REQUEST
-          // ================================================================
-
           getAll() {
             return request.cookies.getAll();
           },
 
-          // ================================================================
-          // AUTH TOKEN DITULIS KE RESPONSE
-          // ================================================================
-
           setAll(
-            cookiesToSet,
-            headers
+            cookiesToSet
           ) {
             cookiesToSet.forEach(
               ({
@@ -266,132 +290,244 @@ export async function GET(
                 );
               }
             );
-
-            if (headers) {
-              Object.entries(
-                headers
-              ).forEach(
-                ([
-                  key,
-                  value,
-                ]) => {
-                  response.headers.set(
-                    key,
-                    value
-                  );
-                }
-              );
-            }
           },
         },
       }
     );
 
   // ==========================================================================
-  // EXCHANGE CODE + FLOW ID
+  // EXCHANGE
   // ==========================================================================
 
-  const {
-    data,
-    error,
-  } =
-    await supabase.auth
-      .exchangeCodeForSession(
-        code,
+  try {
+    const {
+      data,
+      error,
+    } =
+      await supabase.auth
+        .exchangeCodeForSession(
+          code,
+          flowId
+            ? {
+                flowId,
+              }
+            : undefined
+        );
+
+    // ========================================================================
+    // EXCHANGE ERROR
+    // ========================================================================
+
+    if (error) {
+      console.error(
+        "[AUTH CALLBACK] EXCHANGE ERROR:",
         {
-          flowId,
+          message:
+            error.message,
+
+          name:
+            error.name,
+
+          flowId:
+            flowId ||
+            null,
+
+          hasMatchingVerifier:
+            Boolean(
+              matchingVerifier
+            ),
         }
       );
 
-  // ==========================================================================
-  // ERROR
-  // ==========================================================================
+      const diagnosticResponse =
+        NextResponse.json(
+          {
+            success: false,
 
-  if (error) {
-    console.error(
-      "[AUTH CALLBACK] Exchange gagal:",
+            stage:
+              "exchange",
+
+            error:
+              error.message,
+
+            errorName:
+              error.name,
+
+            flowId:
+              flowId ||
+              null,
+
+            hasCode:
+              true,
+
+            hasMatchingVerifier:
+              Boolean(
+                matchingVerifier
+              ),
+
+            matchingVerifierName:
+              matchingVerifier ||
+              null,
+
+            requestSupabaseCookies:
+              supabaseCookieNames,
+
+            responseCookies:
+              response.cookies
+                .getAll()
+                .map(
+                  (cookie) =>
+                    cookie.name
+                ),
+          },
+          {
+            status: 400,
+
+            headers: {
+              "Cache-Control":
+                "private, no-store, max-age=0",
+            },
+          }
+        );
+
+      /**
+       * Supabase mungkin sudah meminta
+       * penghapusan verifier yang gagal.
+       *
+       * Jangan buang Set-Cookie tersebut.
+       */
+      return copyResponseCookies(
+        response,
+        diagnosticResponse
+      );
+    }
+
+    // ========================================================================
+    // SESSION KOSONG
+    // ========================================================================
+
+    if (
+      !data.session ||
+      !data.user
+    ) {
+      const diagnosticResponse =
+        NextResponse.json(
+          {
+            success: false,
+
+            stage:
+              "session",
+
+            error:
+              "exchangeCodeForSession selesai tetapi session/user kosong.",
+
+            flowId:
+              flowId ||
+              null,
+
+            hasMatchingVerifier:
+              Boolean(
+                matchingVerifier
+              ),
+
+            requestSupabaseCookies:
+              supabaseCookieNames,
+
+            responseCookies:
+              response.cookies
+                .getAll()
+                .map(
+                  (cookie) =>
+                    cookie.name
+                ),
+          },
+          {
+            status: 500,
+          }
+        );
+
+      return copyResponseCookies(
+        response,
+        diagnosticResponse
+      );
+    }
+
+    // ========================================================================
+    // SUCCESS
+    // ========================================================================
+
+    console.log(
+      "[AUTH CALLBACK] SUCCESS:",
       {
-        message:
-          error.message,
+        userId:
+          data.user.id,
 
-        name:
-          error.name,
+        flowId:
+          flowId ||
+          null,
 
-        flowId,
+        cookiesWritten:
+          response.cookies
+            .getAll()
+            .map(
+              (cookie) =>
+                cookie.name
+            ),
       }
     );
 
-    const loginUrl =
-      new URL(
-        "/login",
-        request.url
-      );
-
-    loginUrl.searchParams.set(
-      "error",
-      error.message
-    );
-
-    return NextResponse.redirect(
-      loginUrl
-    );
-  }
-
-  // ==========================================================================
-  // VALIDATE SESSION
-  // ==========================================================================
-
-  if (
-    !data.session ||
-    !data.user
+    return response;
+  } catch (
+    error
   ) {
     console.error(
-      "[AUTH CALLBACK] Session kosong setelah exchange.",
-      {
-        flowId,
-      }
+      "[AUTH CALLBACK] EXCEPTION:",
+      error
     );
 
-    const loginUrl =
-      new URL(
-        "/login",
-        request.url
+    const diagnosticResponse =
+      NextResponse.json(
+        {
+          success: false,
+
+          stage:
+            "exception",
+
+          error:
+            error instanceof Error
+              ? error.message
+              : String(
+                  error
+                ),
+
+          flowId:
+            flowId ||
+            null,
+
+          hasMatchingVerifier:
+            Boolean(
+              matchingVerifier
+            ),
+
+          requestSupabaseCookies:
+            supabaseCookieNames,
+
+          responseCookies:
+            response.cookies
+              .getAll()
+              .map(
+                (cookie) =>
+                  cookie.name
+              ),
+        },
+        {
+          status: 500,
+        }
       );
 
-    loginUrl.searchParams.set(
-      "error",
-      "session_not_created"
-    );
-
-    return NextResponse.redirect(
-      loginUrl
+    return copyResponseCookies(
+      response,
+      diagnosticResponse
     );
   }
-
-  // ==========================================================================
-  // SUCCESS
-  // ==========================================================================
-
-  console.log(
-    "[AUTH CALLBACK] LOGIN SUCCESS:",
-    {
-      userId:
-        data.user.id,
-
-      email:
-        data.user.email,
-
-      flowId,
-
-      cookiesWritten:
-        response.cookies
-          .getAll()
-          .map(
-            (cookie) =>
-              cookie.name
-          ),
-    }
-  );
-
-  return response;
 }
