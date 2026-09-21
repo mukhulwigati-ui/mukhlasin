@@ -45,14 +45,7 @@ export default function AkunPage() {
     return createBrowserClient(url, anonKey);
   }, []);
 
-  // ==========================================================================
-  // AUTH HELPER
-  // ==========================================================================
-
   const getAuthenticatedUser = useCallback(async () => {
-    // Setelah OAuth callback, cookie kadang membutuhkan jeda sangat singkat
-    // sebelum terbaca sempurna oleh browser client. Jangan langsung lempar
-    // user kembali ke /login pada percobaan pertama.
     for (let attempt = 0; attempt < 4; attempt += 1) {
       const {
         data: { user: verifiedUser },
@@ -70,7 +63,6 @@ export default function AkunPage() {
         );
       }
 
-      // Fallback: cek session lokal/cookie sebelum memutuskan belum login.
       const {
         data: { session },
       } = await supabase.auth.getSession();
@@ -86,10 +78,6 @@ export default function AkunPage() {
 
     return null;
   }, [supabase]);
-
-  // ==========================================================================
-  // SYNC FUNDRAISER SUPABASE -> SANITY
-  // ==========================================================================
 
   const syncFundraiser = useCallback(async () => {
     try {
@@ -114,10 +102,6 @@ export default function AkunPage() {
       return false;
     }
   }, []);
-
-  // ==========================================================================
-  // LOAD ACCOUNT
-  // ==========================================================================
 
   useEffect(() => {
     let active = true;
@@ -153,7 +137,6 @@ export default function AkunPage() {
 
         let prof = existingProfile;
 
-        // Jika akun Google baru belum mempunyai baris profiles, buat otomatis.
         if (!prof) {
           const meta = authenticatedUser.user_metadata || {};
 
@@ -184,8 +167,6 @@ export default function AkunPage() {
               '[AKUN] Gagal membuat profile:',
               profileCreateError
             );
-
-            // UI tetap dapat digunakan menggunakan metadata Google.
             prof = profileToCreate;
           } else {
             prof = createdProfile || profileToCreate;
@@ -197,14 +178,9 @@ export default function AkunPage() {
         setProfile(prof);
         setNewPhone(prof?.phone || '');
 
-        // Bila nomor WA sudah tersedia, pastikan relawan/fundraiser ada di Sanity.
         if (prof?.phone) {
           await syncFundraiser();
         }
-
-        // ================================================================
-        // DONATION HISTORY
-        // ================================================================
 
         const {
           data: donData,
@@ -219,10 +195,6 @@ export default function AkunPage() {
         } else if (active && donData) {
           setDonations(donData);
         }
-
-        // ================================================================
-        // REFERRAL VISITS
-        // ================================================================
 
         try {
           const phoneKey = prof?.phone || authenticatedUser.id;
@@ -355,8 +327,6 @@ export default function AkunPage() {
     setSavingPhone(true);
 
     try {
-      // Upsert lebih aman daripada update: bila profile belum sempat dibuat,
-      // nomor WhatsApp tetap tersimpan.
       const { error } = await supabase
         .from('profiles')
         .upsert(
@@ -391,7 +361,6 @@ export default function AkunPage() {
 
       setNewPhone(clean);
 
-      // Nomor WhatsApp = aktivasi fundraiser.
       const synced = await syncFundraiser();
 
       setIsModalOpen(false);
@@ -444,13 +413,13 @@ export default function AkunPage() {
   if (loadError) {
     return (
       <div className="min-h-screen bg-[#f8f8f6] flex items-center justify-center px-4">
-        <div className="w-full max-w-sm rounded-2xl border border-red-100 bg-white p-6 text-center shadow-sm">
+        <div className="w-full max-w-sm rounded-none border border-red-100 bg-white p-6 text-center shadow-sm">
           <p className="text-sm font-bold text-slate-800">Akun belum dapat dimuat</p>
           <p className="mt-2 text-xs leading-relaxed text-slate-500">{loadError}</p>
           <button
             type="button"
             onClick={() => window.location.reload()}
-            className="mt-5 w-full rounded-xl bg-[#102a43] px-4 py-3 text-xs font-bold text-white"
+            className="mt-5 w-full rounded-none bg-[#102a43] px-4 py-3 text-xs font-bold text-white"
           >
             Muat Ulang
           </button>
@@ -460,13 +429,13 @@ export default function AkunPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f8f8f6] text-slate-900 pb-28 pt-5 px-4">
-      <div className="max-w-md mx-auto space-y-4">
+    <div className="min-h-screen bg-[#f8f8f6] text-slate-900 pb-28 pt-2 px-0 max-w-md mx-auto">
+      <div className="w-full space-y-3">
 
         {/* =========================================================
             HEADER PROFILE
         ========================================================= */}
-        <section className="relative overflow-hidden rounded-[28px] bg-[#102a43] p-5 shadow-[0_18px_45px_rgba(16,42,67,0.16)]">
+        <section className="relative overflow-hidden rounded-none bg-[#102a43] p-5 shadow-[0_18px_45px_rgba(16,42,67,0.16)]">
 
           <div className="absolute -right-14 -top-16 w-44 h-44 rounded-full border border-white/8" />
 
@@ -522,7 +491,7 @@ export default function AkunPage() {
         {/* =========================================================
             DONATION SUMMARY
         ========================================================= */}
-        <section className="rounded-[28px] bg-white border border-slate-200/70 shadow-[0_8px_30px_rgba(15,23,42,0.04)] overflow-hidden">
+        <section className="rounded-none bg-white border-y border-slate-200/70 shadow-[0_8px_30px_rgba(15,23,42,0.04)] overflow-hidden">
 
           <div className="p-5">
 
@@ -588,7 +557,6 @@ export default function AkunPage() {
             </div>
           </div>
 
-          {/* GOLD ACCENT */}
           <div className="h-[3px] bg-gradient-to-r from-[#b08a3d] via-[#dfc27e] to-[#b08a3d]" />
 
         </section>
@@ -596,7 +564,7 @@ export default function AkunPage() {
         {/* =========================================================
             TARGET SEDEKAH
         ========================================================= */}
-        <section className="rounded-[26px] bg-white border border-slate-200/70 p-5 shadow-[0_8px_30px_rgba(15,23,42,0.04)]">
+        <section className="rounded-none bg-white border-y border-slate-200/70 p-5 shadow-[0_8px_30px_rgba(15,23,42,0.04)]">
 
           <div className="flex items-center justify-between">
 
@@ -654,7 +622,7 @@ export default function AkunPage() {
         {/* =========================================================
             WHATSAPP
         ========================================================= */}
-        <section className="rounded-[24px] bg-white border border-slate-200/70 p-4 shadow-[0_8px_30px_rgba(15,23,42,0.04)]">
+        <section className="rounded-none bg-white border-y border-slate-200/70 p-4 shadow-[0_8px_30px_rgba(15,23,42,0.04)]">
 
           <div className="flex items-center justify-between">
 
@@ -678,7 +646,7 @@ export default function AkunPage() {
 
             <button
               onClick={() => setIsModalOpen(true)}
-              className="rounded-xl border border-slate-200 px-3.5 py-2 text-[9px] font-bold uppercase tracking-wider text-[#102a43] hover:bg-slate-50 transition cursor-pointer"
+              className="rounded-none border border-slate-200 px-3.5 py-2 text-[9px] font-bold uppercase tracking-wider text-[#102a43] hover:bg-slate-50 transition cursor-pointer"
             >
               Ubah
             </button>
@@ -690,7 +658,7 @@ export default function AkunPage() {
         {/* =========================================================
             MENU
         ========================================================= */}
-        <section className="rounded-[26px] bg-white border border-slate-200/70 overflow-hidden shadow-[0_8px_30px_rgba(15,23,42,0.04)]">
+        <section className="rounded-none bg-white border-y border-slate-200/70 overflow-hidden shadow-[0_8px_30px_rgba(15,23,42,0.04)]">
 
           <div className="px-5 pt-5 pb-3">
             <p className="text-[8px] font-bold uppercase tracking-[0.2em] text-slate-400">
@@ -706,7 +674,7 @@ export default function AkunPage() {
 
             <Link
               href="/donasi-saya"
-              className="group flex items-center justify-between rounded-2xl px-3 py-3.5 hover:bg-[#f8f8f6] transition"
+              className="group flex items-center justify-between rounded-none px-3 py-3.5 hover:bg-[#f8f8f6] transition"
             >
               <div className="flex items-center gap-3">
 
@@ -725,7 +693,7 @@ export default function AkunPage() {
 
             <Link
               href="/kuitansi"
-              className="group flex items-center justify-between rounded-2xl px-3 py-3.5 hover:bg-[#f8f8f6] transition"
+              className="group flex items-center justify-between rounded-none px-3 py-3.5 hover:bg-[#f8f8f6] transition"
             >
               <div className="flex items-center gap-3">
 
@@ -744,7 +712,7 @@ export default function AkunPage() {
 
             <Link
               href="/favorit"
-              className="group flex items-center justify-between rounded-2xl px-3 py-3.5 hover:bg-[#f8f8f6] transition"
+              className="group flex items-center justify-between rounded-none px-3 py-3.5 hover:bg-[#f8f8f6] transition"
             >
               <div className="flex items-center gap-3">
 
@@ -763,7 +731,7 @@ export default function AkunPage() {
 
             <Link
               href="/referral"
-              className="group flex items-center justify-between rounded-2xl px-3 py-3.5 hover:bg-[#f8f8f6] transition"
+              className="group flex items-center justify-between rounded-none px-3 py-3.5 hover:bg-[#f8f8f6] transition"
             >
               <div className="flex items-center gap-3">
 
@@ -788,7 +756,7 @@ export default function AkunPage() {
 
             <Link
               href="/pengaturan"
-              className="group flex items-center justify-between rounded-2xl px-3 py-3.5 hover:bg-[#f8f8f6] transition"
+              className="group flex items-center justify-between rounded-none px-3 py-3.5 hover:bg-[#f8f8f6] transition"
             >
               <div className="flex items-center gap-3">
 
@@ -807,7 +775,7 @@ export default function AkunPage() {
 
             <Link
               href="/bantuan"
-              className="group flex items-center justify-between rounded-2xl px-3 py-3.5 hover:bg-[#f8f8f6] transition"
+              className="group flex items-center justify-between rounded-none px-3 py-3.5 hover:bg-[#f8f8f6] transition"
             >
               <div className="flex items-center gap-3">
 
@@ -832,14 +800,14 @@ export default function AkunPage() {
         ========================================================= */}
         <button
           onClick={handleLogout}
-          className="w-full py-4 rounded-2xl text-[9px] font-bold uppercase tracking-[0.18em] text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition flex items-center justify-center gap-2 cursor-pointer"
+          className="w-full py-4 rounded-none text-[9px] font-bold uppercase tracking-[0.18em] text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition flex items-center justify-center gap-2 cursor-pointer bg-white border-y border-slate-200/70"
         >
           <LogOut className="w-3.5 h-3.5" />
           Keluar dari Akun
         </button>
 
-        <div className="text-center pt-1">
-          <p className="text-[8px] text-slate-300">
+        <div className="text-center pt-1 px-4">
+          <p className="text-[8px] text-slate-400">
             Terima kasih telah menjadi bagian dari gerakan
             kebaikan.
           </p>
@@ -853,7 +821,7 @@ export default function AkunPage() {
       {isModalOpen && (
         <div className="fixed inset-0 bg-[#071521]/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
 
-          <div className="relative w-full max-w-sm overflow-hidden rounded-[28px] bg-white shadow-[0_25px_70px_rgba(0,0,0,0.25)]">
+          <div className="relative w-full max-w-sm overflow-hidden rounded-none bg-white shadow-[0_25px_70px_rgba(0,0,0,0.25)]">
 
             <div className="h-1 bg-gradient-to-r from-[#a37c32] via-[#dfc27e] to-[#a37c32]" />
 
@@ -897,7 +865,7 @@ export default function AkunPage() {
                     onChange={(e) =>
                       setNewPhone(e.target.value)
                     }
-                    className="mt-2 w-full rounded-2xl border border-slate-200 bg-[#f8f8f6] px-4 py-3.5 text-[12px] font-semibold text-slate-800 outline-none transition focus:border-[#a37c32] focus:bg-white"
+                    className="mt-2 w-full rounded-none border border-slate-200 bg-[#f8f8f6] px-4 py-3.5 text-[12px] font-semibold text-slate-800 outline-none transition focus:border-[#a37c32] focus:bg-white"
                   />
 
                   <p className="mt-2 text-[8px] leading-relaxed text-slate-400">
@@ -909,7 +877,7 @@ export default function AkunPage() {
                 <button
                   type="submit"
                   disabled={savingPhone}
-                  className="w-full rounded-2xl bg-[#102a43] hover:bg-[#173d5d] text-white font-bold py-3.5 text-[9px] uppercase tracking-[0.16em] transition disabled:bg-slate-300 shadow-lg shadow-[#102a43]/10 cursor-pointer"
+                  className="w-full rounded-none bg-[#102a43] hover:bg-[#173d5d] text-white font-bold py-3.5 text-[9px] uppercase tracking-[0.16em] transition disabled:bg-slate-300 shadow-lg shadow-[#102a43]/10 cursor-pointer"
                 >
                   {savingPhone
                     ? 'Menyimpan...'
