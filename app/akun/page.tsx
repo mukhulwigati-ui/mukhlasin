@@ -429,7 +429,7 @@ export default function AkunPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f8f8f6] text-slate-900 pb-28 pt-2 px-0 max-w-md mx-auto">
+    <div className="min-h-screen bg-[#f8f8f6] text-slate-900 pb-28 pt-2 px-4 max-w-xl mx-auto w-full">
       <div className="w-full space-y-3">
 
         {/* =========================================================
