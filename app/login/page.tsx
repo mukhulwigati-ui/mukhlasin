@@ -47,7 +47,7 @@ export default function LoginPage() {
     useState("");
 
   // ==========================================================================
-  // SUPABASE
+  // SUPABASE BROWSER CLIENT
   // ==========================================================================
 
   const supabase =
@@ -65,13 +65,34 @@ export default function LoginPage() {
         !anonKey
       ) {
         throw new Error(
-          "Supabase environment variables belum tersedia."
+          "Environment Supabase belum tersedia."
         );
       }
 
       return createBrowserClient(
         url,
-        anonKey
+        anonKey,
+        {
+          auth: {
+            /**
+             * PENTING UNTUK PKCE TERBARU
+             *
+             * Supabase akan menambahkan:
+             *
+             * ?sb_flow_id=xxxx
+             *
+             * ke callback OAuth.
+             *
+             * Callback server kemudian memakai
+             * flow ID yang sama untuk mengambil
+             * code verifier yang tepat.
+             */
+            experimental: {
+              appendPkceFlowIdToRedirects:
+                true,
+            },
+          },
+        }
       );
     }, []);
 
@@ -80,13 +101,6 @@ export default function LoginPage() {
   // ==========================================================================
 
   const getSiteUrl = () => {
-    /**
-     * PRODUCTION
-     *
-     * Pastikan di Vercel:
-     *
-     * NEXT_PUBLIC_SITE_URL=https://www.mukhlasin.or.id
-     */
     const envUrl =
       process.env
         .NEXT_PUBLIC_SITE_URL;
@@ -98,9 +112,7 @@ export default function LoginPage() {
       );
     }
 
-    /**
-     * LOCAL DEVELOPMENT
-     */
+    // Local development
     if (
       typeof window !==
       "undefined"
@@ -118,13 +130,7 @@ export default function LoginPage() {
       }
     }
 
-    /**
-     * FALLBACK PRODUCTION
-     *
-     * Jangan gunakan window.location.origin
-     * untuk production supaya OAuth selalu
-     * kembali ke domain www.
-     */
+    // Production fallback
     return "https://www.mukhlasin.or.id";
   };
 
@@ -133,25 +139,11 @@ export default function LoginPage() {
   // ==========================================================================
 
   const getCallbackUrl = () => {
-    const siteUrl =
-      getSiteUrl();
-
-    /**
-     * PENTING:
-     *
-     * Jangan tambahkan:
-     *
-     * ?next=/akun
-     *
-     * Callback harus EXACT:
-     *
-     * https://www.mukhlasin.or.id/auth/callback
-     */
-    return `${siteUrl}/auth/callback`;
+    return `${getSiteUrl()}/auth/callback`;
   };
 
   // ==========================================================================
-  // CHECK ERROR DARI CALLBACK
+  // READ CALLBACK ERROR
   // ==========================================================================
 
   useEffect(() => {
@@ -172,15 +164,13 @@ export default function LoginPage() {
 
     if (authError) {
       setErrorMessage(
-        decodeURIComponent(
-          authError
-        )
+        authError
       );
     }
   }, []);
 
   // ==========================================================================
-  // CHECK USER LOGIN
+  // CHECK EXISTING SESSION
   // ==========================================================================
 
   useEffect(() => {
@@ -193,7 +183,6 @@ export default function LoginPage() {
             data: {
               user,
             },
-
             error,
           } =
             await supabase.auth
@@ -211,7 +200,7 @@ export default function LoginPage() {
             user
           ) {
             console.log(
-              "[LOGIN] User sudah login:",
+              "[LOGIN] User aktif:",
               user.id
             );
 
@@ -225,7 +214,7 @@ export default function LoginPage() {
           error
         ) {
           console.error(
-            "[LOGIN] Check user error:",
+            "[LOGIN] Check session error:",
             error
           );
         } finally {
@@ -240,7 +229,7 @@ export default function LoginPage() {
     checkUser();
 
     // ========================================================================
-    // AUTH STATE LISTENER
+    // AUTH STATE
     // ========================================================================
 
     const {
@@ -264,11 +253,6 @@ export default function LoginPage() {
                 "SIGNED_IN" &&
               session?.user
             ) {
-              console.log(
-                "[LOGIN] SIGNED_IN:",
-                session.user.id
-              );
-
               window.location.replace(
                 "/akun"
               );
@@ -299,9 +283,9 @@ export default function LoginPage() {
         return;
       }
 
+      setLoading(true);
       setErrorMessage("");
       setSuccessMessage("");
-      setLoading(true);
 
       try {
         // ====================================================================
@@ -316,7 +300,7 @@ export default function LoginPage() {
             getCallbackUrl();
 
           console.log(
-            "[REGISTER] Email callback:",
+            "[REGISTER] Callback:",
             callbackUrl
           );
 
@@ -332,12 +316,6 @@ export default function LoginPage() {
                 password,
 
                 options: {
-                  /**
-                   * PENTING:
-                   *
-                   * EXACT callback.
-                   * Tanpa ?next=/akun
-                   */
                   emailRedirectTo:
                     callbackUrl,
                 },
@@ -345,7 +323,7 @@ export default function LoginPage() {
 
           if (error) {
             console.error(
-              "[REGISTER] Sign up error:",
+              "[REGISTER] Error:",
               error
             );
 
@@ -356,29 +334,16 @@ export default function LoginPage() {
             return;
           }
 
-          // ================================================================
-          // SESSION LANGSUNG TERBENTUK
-          // ================================================================
-
           if (
-            data.session &&
-            data.user
+            data.user &&
+            data.session
           ) {
-            console.log(
-              "[REGISTER] Session langsung terbentuk:",
-              data.user.id
-            );
-
             window.location.replace(
               "/akun"
             );
 
             return;
           }
-
-          // ================================================================
-          // EMAIL CONFIRMATION
-          // ================================================================
 
           setSuccessMessage(
             "Pendaftaran berhasil. Silakan periksa email Anda untuk melakukan verifikasi."
@@ -392,7 +357,7 @@ export default function LoginPage() {
         }
 
         // ====================================================================
-        // LOGIN EMAIL
+        // EMAIL LOGIN
         // ====================================================================
 
         const {
@@ -409,7 +374,7 @@ export default function LoginPage() {
 
         if (error) {
           console.error(
-            "[LOGIN] Email login error:",
+            "[LOGIN] Email error:",
             error
           );
 
@@ -425,20 +390,11 @@ export default function LoginPage() {
           !data.session
         ) {
           setErrorMessage(
-            "Login berhasil tetapi sesi tidak terbentuk. Silakan coba kembali."
+            "Login berhasil tetapi sesi tidak terbentuk."
           );
 
           return;
         }
-
-        console.log(
-          "[LOGIN] Email login success:",
-          data.user.id
-        );
-
-        // ====================================================================
-        // LOGIN SUCCESS
-        // ====================================================================
 
         window.location.replace(
           "/akun"
@@ -485,19 +441,10 @@ export default function LoginPage() {
           getCallbackUrl();
 
         console.log(
-          "[LOGIN] Google redirectTo:",
+          "[LOGIN] Google callback:",
           redirectTo
         );
 
-        /**
-         * Yang harus tercetak:
-         *
-         * https://www.mukhlasin.or.id/auth/callback
-         *
-         * BUKAN:
-         *
-         * https://www.mukhlasin.or.id/auth/callback?next=/akun
-         */
         const {
           data,
           error,
@@ -537,29 +484,28 @@ export default function LoginPage() {
           return;
         }
 
+        /**
+         * Pada versi Supabase baru,
+         * data dapat berisi flowId.
+         */
         console.log(
-          "[LOGIN] Google OAuth dimulai:",
-          data
+          "[LOGIN] OAuth dimulai:",
+          {
+            url:
+              data.url,
+
+            flowId:
+              "flowId" in data
+                ? data.flowId
+                : null,
+          }
         );
 
         /**
-         * Jangan redirect manual di sini.
+         * Tidak perlu router.push().
          *
-         * Supabase akan membawa browser:
-         *
-         * Google
-         * ↓
-         * Supabase
-         * ↓
-         * /auth/callback
-         *
-         * Callback kemudian:
-         *
-         * exchangeCodeForSession(code)
-         * ↓
-         * membuat auth cookie
-         * ↓
-         * redirect /akun
+         * Supabase akan membawa browser
+         * ke Google secara otomatis.
          */
       } catch (
         error
@@ -580,12 +526,13 @@ export default function LoginPage() {
     };
 
   // ==========================================================================
-  // LOADING CHECK SESSION
+  // CHECKING SESSION
   // ==========================================================================
 
   if (checkingAuth) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-slate-50">
+
         <div className="text-center">
 
           <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-[#0d5c91]" />
@@ -595,6 +542,7 @@ export default function LoginPage() {
           </p>
 
         </div>
+
       </main>
     );
   }
@@ -608,9 +556,7 @@ export default function LoginPage() {
 
       <div className="w-full max-w-sm rounded-2xl border border-slate-100 bg-white p-8 text-left shadow-sm">
 
-        {/* ================================================================== */}
         {/* HEADER */}
-        {/* ================================================================== */}
 
         <div className="mb-6 flex items-center justify-between gap-4">
 
@@ -649,9 +595,7 @@ export default function LoginPage() {
 
         </div>
 
-        {/* ================================================================== */}
-        {/* ERROR MESSAGE */}
-        {/* ================================================================== */}
+        {/* ERROR */}
 
         {errorMessage && (
           <div className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs font-medium leading-relaxed text-red-700">
@@ -659,9 +603,7 @@ export default function LoginPage() {
           </div>
         )}
 
-        {/* ================================================================== */}
-        {/* SUCCESS MESSAGE */}
-        {/* ================================================================== */}
+        {/* SUCCESS */}
 
         {successMessage && (
           <div className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs font-medium leading-relaxed text-emerald-700">
@@ -669,9 +611,7 @@ export default function LoginPage() {
           </div>
         )}
 
-        {/* ================================================================== */}
         {/* EMAIL FORM */}
-        {/* ================================================================== */}
 
         <form
           onSubmit={
@@ -679,8 +619,6 @@ export default function LoginPage() {
           }
           className="space-y-4"
         >
-
-          {/* EMAIL */}
 
           <div>
 
@@ -707,8 +645,6 @@ export default function LoginPage() {
             />
 
           </div>
-
-          {/* PASSWORD */}
 
           <div>
 
@@ -742,8 +678,6 @@ export default function LoginPage() {
 
           </div>
 
-          {/* SUBMIT */}
-
           <button
             type="submit"
             disabled={
@@ -762,9 +696,7 @@ export default function LoginPage() {
 
         </form>
 
-        {/* ================================================================== */}
         {/* DIVIDER */}
-        {/* ================================================================== */}
 
         <div className="relative my-6">
 
@@ -780,9 +712,7 @@ export default function LoginPage() {
 
         </div>
 
-        {/* ================================================================== */}
         {/* GOOGLE */}
-        {/* ================================================================== */}
 
         <button
           type="button"
@@ -821,6 +751,7 @@ export default function LoginPage() {
         </button>
 
       </div>
+
     </main>
   );
 }
