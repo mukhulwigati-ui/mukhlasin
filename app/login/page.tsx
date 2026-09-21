@@ -81,9 +81,9 @@ export default function LoginPage() {
 
   const getSiteUrl = () => {
     /**
-     * Utamakan URL production dari Vercel.
+     * PRODUCTION
      *
-     * Tambahkan di Vercel:
+     * Pastikan di Vercel:
      *
      * NEXT_PUBLIC_SITE_URL=https://www.mukhlasin.or.id
      */
@@ -98,15 +98,86 @@ export default function LoginPage() {
       );
     }
 
+    /**
+     * LOCAL DEVELOPMENT
+     */
     if (
       typeof window !==
       "undefined"
     ) {
-      return window.location.origin;
+      const hostname =
+        window.location.hostname;
+
+      if (
+        hostname ===
+          "localhost" ||
+        hostname ===
+          "127.0.0.1"
+      ) {
+        return window.location.origin;
+      }
     }
 
+    /**
+     * FALLBACK PRODUCTION
+     *
+     * Jangan gunakan window.location.origin
+     * untuk production supaya OAuth selalu
+     * kembali ke domain www.
+     */
     return "https://www.mukhlasin.or.id";
   };
+
+  // ==========================================================================
+  // CALLBACK URL
+  // ==========================================================================
+
+  const getCallbackUrl = () => {
+    const siteUrl =
+      getSiteUrl();
+
+    /**
+     * PENTING:
+     *
+     * Jangan tambahkan:
+     *
+     * ?next=/akun
+     *
+     * Callback harus EXACT:
+     *
+     * https://www.mukhlasin.or.id/auth/callback
+     */
+    return `${siteUrl}/auth/callback`;
+  };
+
+  // ==========================================================================
+  // CHECK ERROR DARI CALLBACK
+  // ==========================================================================
+
+  useEffect(() => {
+    if (
+      typeof window ===
+      "undefined"
+    ) {
+      return;
+    }
+
+    const params =
+      new URLSearchParams(
+        window.location.search
+      );
+
+    const authError =
+      params.get("error");
+
+    if (authError) {
+      setErrorMessage(
+        decodeURIComponent(
+          authError
+        )
+      );
+    }
+  }, []);
 
   // ==========================================================================
   // CHECK USER LOGIN
@@ -118,13 +189,6 @@ export default function LoginPage() {
     const checkUser =
       async () => {
         try {
-          /**
-           * getUser() lebih tepat daripada
-           * hanya mengandalkan getSession().
-           *
-           * getUser() meminta Supabase
-           * memverifikasi user aktif.
-           */
           const {
             data: {
               user,
@@ -132,7 +196,8 @@ export default function LoginPage() {
 
             error,
           } =
-            await supabase.auth.getUser();
+            await supabase.auth
+              .getUser();
 
           if (error) {
             console.warn(
@@ -145,12 +210,11 @@ export default function LoginPage() {
             mounted &&
             user
           ) {
-            /**
-             * Hard redirect sengaja dipakai
-             * supaya seluruh auth state,
-             * Header, modal login, dll
-             * dibaca ulang dari awal.
-             */
+            console.log(
+              "[LOGIN] User sudah login:",
+              user.id
+            );
+
             window.location.replace(
               "/akun"
             );
@@ -176,7 +240,7 @@ export default function LoginPage() {
     checkUser();
 
     // ========================================================================
-    // LISTEN AUTH CHANGE
+    // AUTH STATE LISTENER
     // ========================================================================
 
     const {
@@ -200,6 +264,11 @@ export default function LoginPage() {
                 "SIGNED_IN" &&
               session?.user
             ) {
+              console.log(
+                "[LOGIN] SIGNED_IN:",
+                session.user.id
+              );
+
               window.location.replace(
                 "/akun"
               );
@@ -243,28 +312,43 @@ export default function LoginPage() {
           mode ===
           "register"
         ) {
-          const siteUrl =
-            getSiteUrl();
+          const callbackUrl =
+            getCallbackUrl();
+
+          console.log(
+            "[REGISTER] Email callback:",
+            callbackUrl
+          );
 
           const {
             data,
             error,
           } =
-            await supabase.auth.signUp(
-              {
+            await supabase.auth
+              .signUp({
                 email:
                   email.trim(),
 
                 password,
 
                 options: {
+                  /**
+                   * PENTING:
+                   *
+                   * EXACT callback.
+                   * Tanpa ?next=/akun
+                   */
                   emailRedirectTo:
-                    `${siteUrl}/auth/callback?next=/akun`,
+                    callbackUrl,
                 },
-              }
-            );
+              });
 
           if (error) {
+            console.error(
+              "[REGISTER] Sign up error:",
+              error
+            );
+
             setErrorMessage(
               error.message
             );
@@ -273,13 +357,18 @@ export default function LoginPage() {
           }
 
           // ================================================================
-          // AUTO LOGIN JIKA SESSION LANGSUNG TERBENTUK
+          // SESSION LANGSUNG TERBENTUK
           // ================================================================
 
           if (
             data.session &&
             data.user
           ) {
+            console.log(
+              "[REGISTER] Session langsung terbentuk:",
+              data.user.id
+            );
+
             window.location.replace(
               "/akun"
             );
@@ -288,7 +377,7 @@ export default function LoginPage() {
           }
 
           // ================================================================
-          // BUTUH EMAIL CONFIRMATION
+          // EMAIL CONFIRMATION
           // ================================================================
 
           setSuccessMessage(
@@ -319,6 +408,11 @@ export default function LoginPage() {
             });
 
         if (error) {
+          console.error(
+            "[LOGIN] Email login error:",
+            error
+          );
+
           setErrorMessage(
             error.message
           );
@@ -336,6 +430,11 @@ export default function LoginPage() {
 
           return;
         }
+
+        console.log(
+          "[LOGIN] Email login success:",
+          data.user.id
+        );
 
         // ====================================================================
         // LOGIN SUCCESS
@@ -382,18 +481,25 @@ export default function LoginPage() {
       setSuccessMessage("");
 
       try {
-        const siteUrl =
-          getSiteUrl();
-
         const redirectTo =
-          `${siteUrl}/auth/callback?next=/akun`;
+          getCallbackUrl();
 
         console.log(
-          "[LOGIN] Google redirect:",
+          "[LOGIN] Google redirectTo:",
           redirectTo
         );
 
+        /**
+         * Yang harus tercetak:
+         *
+         * https://www.mukhlasin.or.id/auth/callback
+         *
+         * BUKAN:
+         *
+         * https://www.mukhlasin.or.id/auth/callback?next=/akun
+         */
         const {
+          data,
           error,
         } =
           await supabase.auth
@@ -404,10 +510,6 @@ export default function LoginPage() {
               options: {
                 redirectTo,
 
-                /**
-                 * Supaya setiap login Google
-                 * memilih/memastikan account.
-                 */
                 queryParams: {
                   access_type:
                     "offline",
@@ -431,13 +533,33 @@ export default function LoginPage() {
           setGoogleLoading(
             false
           );
+
+          return;
         }
 
+        console.log(
+          "[LOGIN] Google OAuth dimulai:",
+          data
+        );
+
         /**
-         * Kalau sukses, browser akan
-         * meninggalkan halaman ini menuju Google.
+         * Jangan redirect manual di sini.
          *
-         * Tidak perlu setGoogleLoading(false).
+         * Supabase akan membawa browser:
+         *
+         * Google
+         * ↓
+         * Supabase
+         * ↓
+         * /auth/callback
+         *
+         * Callback kemudian:
+         *
+         * exchangeCodeForSession(code)
+         * ↓
+         * membuat auth cookie
+         * ↓
+         * redirect /akun
          */
       } catch (
         error
@@ -465,11 +587,13 @@ export default function LoginPage() {
     return (
       <main className="flex min-h-screen items-center justify-center bg-slate-50">
         <div className="text-center">
+
           <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-[#0d5c91]" />
 
           <p className="mt-4 text-sm font-bold text-slate-500">
             Memeriksa sesi...
           </p>
+
         </div>
       </main>
     );
@@ -481,6 +605,7 @@ export default function LoginPage() {
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-slate-50 p-4">
+
       <div className="w-full max-w-sm rounded-2xl border border-slate-100 bg-white p-8 text-left shadow-sm">
 
         {/* ================================================================== */}
@@ -521,10 +646,11 @@ export default function LoginPage() {
               ? "Belum punya akun? Daftar"
               : "Sudah punya akun? Masuk"}
           </button>
+
         </div>
 
         {/* ================================================================== */}
-        {/* MESSAGE */}
+        {/* ERROR MESSAGE */}
         {/* ================================================================== */}
 
         {errorMessage && (
@@ -532,6 +658,10 @@ export default function LoginPage() {
             {errorMessage}
           </div>
         )}
+
+        {/* ================================================================== */}
+        {/* SUCCESS MESSAGE */}
+        {/* ================================================================== */}
 
         {successMessage && (
           <div className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs font-medium leading-relaxed text-emerald-700">
@@ -549,9 +679,11 @@ export default function LoginPage() {
           }
           className="space-y-4"
         >
+
           {/* EMAIL */}
 
           <div>
+
             <label className="mb-1.5 block text-sm font-semibold text-slate-600">
               Email
             </label>
@@ -573,11 +705,13 @@ export default function LoginPage() {
               }
               required
             />
+
           </div>
 
           {/* PASSWORD */}
 
           <div>
+
             <label className="mb-1.5 block text-sm font-semibold text-slate-600">
               Kata Sandi
             </label>
@@ -605,6 +739,7 @@ export default function LoginPage() {
               minLength={6}
               required
             />
+
           </div>
 
           {/* SUBMIT */}
@@ -624,6 +759,7 @@ export default function LoginPage() {
                 ? "Masuk"
                 : "Daftar dengan Email"}
           </button>
+
         </form>
 
         {/* ================================================================== */}
@@ -641,6 +777,7 @@ export default function LoginPage() {
               Atau lanjutkan dengan
             </span>
           </div>
+
         </div>
 
         {/* ================================================================== */}
@@ -658,6 +795,7 @@ export default function LoginPage() {
           }
           className="flex w-full cursor-pointer items-center justify-center gap-2.5 rounded-xl border border-slate-200 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
         >
+
           {googleLoading ? (
             <>
               <div className="h-5 w-5 animate-spin rounded-full border-2 border-slate-200 border-t-[#0d5c91]" />
@@ -679,7 +817,9 @@ export default function LoginPage() {
               </span>
             </>
           )}
+
         </button>
+
       </div>
     </main>
   );
