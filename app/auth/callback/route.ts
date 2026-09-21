@@ -23,21 +23,12 @@ export async function GET(
     request.nextUrl.clone();
 
   // ==========================================================================
-  // 1. PARAMETER
+  // 1. AMBIL PARAMETER
   // ==========================================================================
 
   const code =
     requestUrl.searchParams.get(
       "code"
-    );
-
-  /**
-   * Supabase versi baru mendukung flow ID untuk PKCE.
-   * Kalau parameter ini tersedia, kita teruskan ke exchangeCodeForSession().
-   */
-  const flowId =
-    requestUrl.searchParams.get(
-      "sb_flow_id"
     );
 
   const nextParam =
@@ -56,7 +47,7 @@ export async function GET(
     );
 
   // ==========================================================================
-  // 2. SAFE DESTINATION
+  // 2. SAFE REDIRECT
   // ==========================================================================
 
   const next =
@@ -67,10 +58,18 @@ export async function GET(
       : "/akun";
 
   // ==========================================================================
-  // 3. ERROR DARI PROVIDER
+  // 3. ERROR DARI GOOGLE / SUPABASE
   // ==========================================================================
 
   if (oauthError) {
+    console.error(
+      "[AUTH CALLBACK] OAuth error:",
+      {
+        oauthError,
+        errorDescription,
+      }
+    );
+
     const loginUrl =
       new URL(
         "/login",
@@ -83,24 +82,20 @@ export async function GET(
         oauthError
     );
 
-    console.error(
-      "[AUTH CALLBACK] OAuth provider error:",
-      {
-        oauthError,
-        errorDescription,
-      }
-    );
-
     return NextResponse.redirect(
       loginUrl
     );
   }
 
   // ==========================================================================
-  // 4. CODE WAJIB ADA
+  // 4. AUTH CODE WAJIB ADA
   // ==========================================================================
 
   if (!code) {
+    console.error(
+      "[AUTH CALLBACK] Authorization code tidak ditemukan."
+    );
+
     const loginUrl =
       new URL(
         "/login",
@@ -118,7 +113,7 @@ export async function GET(
   }
 
   // ==========================================================================
-  // 5. ENV
+  // 5. ENV SUPABASE
   // ==========================================================================
 
   const supabaseUrl =
@@ -136,7 +131,7 @@ export async function GET(
     !supabaseKey
   ) {
     console.error(
-      "[AUTH CALLBACK] Environment Supabase tidak lengkap."
+      "[AUTH CALLBACK] Environment Supabase belum lengkap."
     );
 
     const loginUrl =
@@ -156,14 +151,7 @@ export async function GET(
   }
 
   // ==========================================================================
-  // 6. SIAPKAN RESPONSE REDIRECT SEBELUM EXCHANGE
-  // ==========================================================================
-  //
-  // Ini penting:
-  //
-  // cookie yang dibuat oleh exchangeCodeForSession()
-  // langsung ditempel ke response yang benar-benar dikirim ke browser.
-  //
+  // 6. SIAPKAN DESTINATION
   // ==========================================================================
 
   const destination =
@@ -172,6 +160,18 @@ export async function GET(
       request.url
     );
 
+  // ==========================================================================
+  // 7. RESPONSE REDIRECT
+  // ==========================================================================
+  //
+  // Response dibuat SEBELUM exchange.
+  //
+  // Jadi ketika Supabase menghasilkan auth cookie,
+  // cookie langsung ditempel ke response yang akan
+  // dikirim ke browser.
+  //
+  // ==========================================================================
+
   let response =
     NextResponse.redirect(
       destination
@@ -179,7 +179,7 @@ export async function GET(
 
   response.headers.set(
     "Cache-Control",
-    "private, no-store, max-age=0"
+    "private, no-store, max-age=0, must-revalidate"
   );
 
   response.headers.set(
@@ -193,7 +193,7 @@ export async function GET(
   );
 
   // ==========================================================================
-  // 7. SUPABASE SERVER CLIENT
+  // 8. SUPABASE SERVER CLIENT
   // ==========================================================================
 
   const supabase =
@@ -203,7 +203,15 @@ export async function GET(
       {
         cookies: {
           // ================================================================
-          // COOKIE PKCE / CODE VERIFIER DIBACA LANGSUNG DARI REQUEST
+          // BACA COOKIE DARI REQUEST
+          // ================================================================
+          //
+          // Termasuk:
+          //
+          // sb-xxxxxxxx-auth-token-code-verifier
+          //
+          // yang kita lihat pada endpoint debug.
+          //
           // ================================================================
 
           getAll() {
@@ -211,12 +219,11 @@ export async function GET(
           },
 
           // ================================================================
-          // SESSION COOKIE DITEMPEL LANGSUNG KE RESPONSE REDIRECT
+          // TULIS COOKIE SESSION KE RESPONSE
           // ================================================================
 
           setAll(
-            cookiesToSet,
-            headers
+            cookiesToSet
           ) {
             cookiesToSet.forEach(
               ({
@@ -231,63 +238,58 @@ export async function GET(
                 );
               }
             );
-
-            /**
-             * @supabase/ssr >= 0.10 dapat memberi cache headers
-             * saat token/session diperbarui.
-             */
-            if (headers) {
-              Object.entries(
-                headers
-              ).forEach(
-                ([
-                  key,
-                  value,
-                ]) => {
-                  response.headers.set(
-                    key,
-                    value
-                  );
-                }
-              );
-            }
           },
         },
       }
     );
 
   // ==========================================================================
-  // 8. EXCHANGE AUTH CODE -> SESSION
+  // 9. EXCHANGE CODE -> SESSION
+  // ==========================================================================
+  //
+  // PENTING:
+  //
+  // Versi supabase-js Anda hanya menerima SATU parameter.
+  //
+  // BENAR:
+  //
+  // exchangeCodeForSession(code)
+  //
+  // SALAH:
+  //
+  // exchangeCodeForSession(code, {...})
+  //
   // ==========================================================================
 
   const {
     data,
-    error,
+    error:
+      exchangeError,
   } =
     await supabase.auth
       .exchangeCodeForSession(
-        code,
-        flowId
-          ? {
-              flowId,
-            }
-          : undefined
+        code
       );
 
   // ==========================================================================
-  // 9. EXCHANGE GAGAL
+  // 10. EXCHANGE GAGAL
   // ==========================================================================
 
-  if (error) {
+  if (exchangeError) {
     console.error(
       "[AUTH CALLBACK] exchangeCodeForSession gagal:",
       {
         message:
-          error.message,
+          exchangeError.message,
 
-        flowId:
-          flowId ||
-          null,
+        name:
+          exchangeError.name,
+
+        status:
+          "status" in
+          exchangeError
+            ? exchangeError.status
+            : undefined,
       }
     );
 
@@ -299,7 +301,7 @@ export async function GET(
 
     loginUrl.searchParams.set(
       "error",
-      error.message
+      exchangeError.message
     );
 
     return NextResponse.redirect(
@@ -308,7 +310,7 @@ export async function GET(
   }
 
   // ==========================================================================
-  // 10. PASTIKAN SESSION BENAR-BENAR ADA
+  // 11. PASTIKAN SESSION ADA
   // ==========================================================================
 
   if (
@@ -316,7 +318,7 @@ export async function GET(
     !data.user
   ) {
     console.error(
-      "[AUTH CALLBACK] Exchange selesai tetapi session kosong."
+      "[AUTH CALLBACK] Exchange selesai tetapi session/user kosong."
     );
 
     const loginUrl =
@@ -336,11 +338,19 @@ export async function GET(
   }
 
   // ==========================================================================
-  // 11. DEBUG AMAN
+  // 12. DEBUG SUCCESS
   // ==========================================================================
 
+  const cookieNames =
+    response.cookies
+      .getAll()
+      .map(
+        (cookie) =>
+          cookie.name
+      );
+
   console.log(
-    "[AUTH CALLBACK] SUCCESS",
+    "[AUTH CALLBACK] LOGIN SUCCESS:",
     {
       userId:
         data.user.id,
@@ -348,22 +358,16 @@ export async function GET(
       email:
         data.user.email,
 
-      flowId:
-        flowId ||
-        null,
+      destination:
+        destination.toString(),
 
-      cookieNames:
-        response.cookies
-          .getAll()
-          .map(
-            (cookie) =>
-              cookie.name
-          ),
+      cookiesWritten:
+        cookieNames,
     }
   );
 
   // ==========================================================================
-  // 12. RETURN RESPONSE YANG SUDAH MEMBAWA COOKIE SESSION
+  // 13. RETURN RESPONSE + AUTH COOKIE
   // ==========================================================================
 
   return response;
