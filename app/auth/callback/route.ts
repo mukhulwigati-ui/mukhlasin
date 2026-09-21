@@ -1,40 +1,227 @@
-import { createServerClient, type CookieOptions } from '@supabase/ssr';
-import { cookies } from 'next/headers';
-import { NextResponse } from 'next/server';
+// app/auth/callback/route.ts
+
+import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
+import { createServerClient } from "@supabase/ssr";
 
 export async function GET(request: Request) {
-  const { searchParams, origin } = new URL(request.url);
-  const code = searchParams.get('code');
+  const requestUrl = new URL(request.url);
 
-  if (code) {
-    const cookieStore = await cookies(); // Pastikan await di sini
-    
-    const supabase = createServerClient(
+  const code =
+    requestUrl.searchParams.get("code");
+
+  const next =
+    requestUrl.searchParams.get("next") ||
+    "/akun";
+
+  // Kalau tidak ada code, langsung arahkan ke login
+  if (!code) {
+    return NextResponse.redirect(
+      new URL(
+        "/login?error=missing_code",
+        requestUrl.origin
+      )
+    );
+  }
+
+  const cookieStore =
+    await cookies();
+
+  const supabase =
+    createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       {
         cookies: {
-          get(name: string) {
-            return cookieStore.get(name)?.value;
+          getAll() {
+            return cookieStore.getAll();
           },
-          set(name: string, value: string, options: CookieOptions) {
-            // Menambahkan path: '/' agar cookie berlaku di semua halaman
-            cookieStore.set({ name, value, ...options, path: '/' });
-          },
-          remove(name: string, options: CookieOptions) {
-            cookieStore.delete({ name, ...options, path: '/' });
+
+          setAll(cookiesToSet) {
+            try {
+              cookiesToSet.forEach(
+                ({
+                  name,
+                  value,
+                  options,
+                }) => {
+                  cookieStore.set(
+                    name,
+                    value,
+                    options
+                  );
+                }
+              );
+            } catch {
+              // Aman diabaikan pada context tertentu
+            }
           },
         },
       }
     );
 
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
-    
-    if (!error) {
-      return NextResponse.redirect(`${origin}/`);
-    }
+  // ==========================================================
+  // EXCHANGE CODE -> SESSION
+  // ==========================================================
+
+  const {
+    data,
+    error,
+  } =
+    await supabase.auth.exchangeCodeForSession(
+      code
+    );
+
+  if (error) {
+    console.error(
+      "[AUTH CALLBACK] exchange error:",
+      error
+    );
+
+    return NextResponse.redirect(
+      new URL(
+        `/login?error=${encodeURIComponent(
+          error.message
+        )}`,
+        requestUrl.origin
+      )
+    );
   }
 
-  // Jika gagal, arahkan kembali ke login
-  return NextResponse.redirect(`${origin}/login`);
+  if (!data.session) {
+    console.error(
+      "[AUTH CALLBACK] Session tidak terbentuk."
+    );
+
+    return NextResponse.redirect(
+      new URL(
+        "/login?error=no_session",
+        requestUrl.origin
+      )
+    );
+  }
+
+  // ==========================================================
+  // LOGIN BERHASIL
+  // ==========================================================
+
+  return NextResponse.redirect(
+    new URL(
+      next,
+      requestUrl.origin
+    )
+  );
+}// app/auth/callback/route.ts
+
+import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
+import { createServerClient } from "@supabase/ssr";
+
+export async function GET(request: Request) {
+  const requestUrl = new URL(request.url);
+
+  const code =
+    requestUrl.searchParams.get("code");
+
+  const next =
+    requestUrl.searchParams.get("next") ||
+    "/akun";
+
+  // Kalau tidak ada code, langsung arahkan ke login
+  if (!code) {
+    return NextResponse.redirect(
+      new URL(
+        "/login?error=missing_code",
+        requestUrl.origin
+      )
+    );
+  }
+
+  const cookieStore =
+    await cookies();
+
+  const supabase =
+    createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return cookieStore.getAll();
+          },
+
+          setAll(cookiesToSet) {
+            try {
+              cookiesToSet.forEach(
+                ({
+                  name,
+                  value,
+                  options,
+                }) => {
+                  cookieStore.set(
+                    name,
+                    value,
+                    options
+                  );
+                }
+              );
+            } catch {
+              // Aman diabaikan pada context tertentu
+            }
+          },
+        },
+      }
+    );
+
+  // ==========================================================
+  // EXCHANGE CODE -> SESSION
+  // ==========================================================
+
+  const {
+    data,
+    error,
+  } =
+    await supabase.auth.exchangeCodeForSession(
+      code
+    );
+
+  if (error) {
+    console.error(
+      "[AUTH CALLBACK] exchange error:",
+      error
+    );
+
+    return NextResponse.redirect(
+      new URL(
+        `/login?error=${encodeURIComponent(
+          error.message
+        )}`,
+        requestUrl.origin
+      )
+    );
+  }
+
+  if (!data.session) {
+    console.error(
+      "[AUTH CALLBACK] Session tidak terbentuk."
+    );
+
+    return NextResponse.redirect(
+      new URL(
+        "/login?error=no_session",
+        requestUrl.origin
+      )
+    );
+  }
+
+  // ==========================================================
+  // LOGIN BERHASIL
+  // ==========================================================
+
+  return NextResponse.redirect(
+    new URL(
+      next,
+      requestUrl.origin
+    )
+  );
 }
