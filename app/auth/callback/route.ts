@@ -4,219 +4,281 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 
-export async function GET(request: Request) {
-  const requestUrl = new URL(request.url);
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
+// ============================================================================
+// GET - GOOGLE OAUTH CALLBACK
+// ============================================================================
+
+export async function GET(
+  request: Request
+) {
+  const requestUrl =
+    new URL(request.url);
+
+  // ==========================================================================
+  // 1. AMBIL PARAMETER CALLBACK
+  // ==========================================================================
 
   const code =
-    requestUrl.searchParams.get("code");
+    requestUrl.searchParams.get(
+      "code"
+    );
 
+  const error =
+    requestUrl.searchParams.get(
+      "error"
+    );
+
+  const errorDescription =
+    requestUrl.searchParams.get(
+      "error_description"
+    );
+
+  const nextParam =
+    requestUrl.searchParams.get(
+      "next"
+    );
+
+  // ==========================================================================
+  // 2. TENTUKAN TUJUAN SETELAH LOGIN
+  // ==========================================================================
+
+  /**
+   * Cegah open redirect.
+   *
+   * Hanya path internal yang diawali "/" yang diperbolehkan.
+   */
   const next =
-    requestUrl.searchParams.get("next") ||
-    "/akun";
+    nextParam &&
+    nextParam.startsWith("/") &&
+    !nextParam.startsWith("//")
+      ? nextParam
+      : "/akun";
 
-  // Kalau tidak ada code, langsung arahkan ke login
-  if (!code) {
-    return NextResponse.redirect(
+  // ==========================================================================
+  // 3. JIKA GOOGLE / SUPABASE MENGEMBALIKAN ERROR
+  // ==========================================================================
+
+  if (error) {
+    console.error(
+      "[AUTH CALLBACK] OAuth error:",
+      {
+        error,
+        errorDescription,
+      }
+    );
+
+    const loginUrl =
       new URL(
-        "/login?error=missing_code",
+        "/login",
         requestUrl.origin
-      )
+      );
+
+    loginUrl.searchParams.set(
+      "error",
+      errorDescription ||
+        error
+    );
+
+    return NextResponse.redirect(
+      loginUrl
     );
   }
+
+  // ==========================================================================
+  // 4. CODE WAJIB ADA
+  // ==========================================================================
+
+  if (!code) {
+    console.error(
+      "[AUTH CALLBACK] Authorization code tidak ditemukan."
+    );
+
+    const loginUrl =
+      new URL(
+        "/login",
+        requestUrl.origin
+      );
+
+    loginUrl.searchParams.set(
+      "error",
+      "missing_code"
+    );
+
+    return NextResponse.redirect(
+      loginUrl
+    );
+  }
+
+  // ==========================================================================
+  // 5. CEK ENV SUPABASE
+  // ==========================================================================
+
+  const supabaseUrl =
+    process.env
+      .NEXT_PUBLIC_SUPABASE_URL;
+
+  const supabaseAnonKey =
+    process.env
+      .NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (
+    !supabaseUrl ||
+    !supabaseAnonKey
+  ) {
+    console.error(
+      "[AUTH CALLBACK] Environment Supabase belum lengkap."
+    );
+
+    const loginUrl =
+      new URL(
+        "/login",
+        requestUrl.origin
+      );
+
+    loginUrl.searchParams.set(
+      "error",
+      "supabase_config_missing"
+    );
+
+    return NextResponse.redirect(
+      loginUrl
+    );
+  }
+
+  // ==========================================================================
+  // 6. COOKIE STORE
+  // ==========================================================================
 
   const cookieStore =
     await cookies();
 
+  // ==========================================================================
+  // 7. SUPABASE SERVER CLIENT
+  // ==========================================================================
+
   const supabase =
     createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      supabaseUrl,
+      supabaseAnonKey,
       {
         cookies: {
           getAll() {
             return cookieStore.getAll();
           },
 
-          setAll(cookiesToSet) {
-            try {
-              cookiesToSet.forEach(
-                ({
-                  name,
-                  value,
-                  options,
-                }) => {
+          setAll(
+            cookiesToSet
+          ) {
+            cookiesToSet.forEach(
+              ({
+                name,
+                value,
+                options,
+              }) => {
+                try {
                   cookieStore.set(
                     name,
                     value,
                     options
                   );
+                } catch (
+                  cookieError
+                ) {
+                  console.warn(
+                    "[AUTH CALLBACK] Cookie tidak dapat ditulis:",
+                    cookieError
+                  );
                 }
-              );
-            } catch {
-              // Aman diabaikan pada context tertentu
-            }
+              }
+            );
           },
         },
       }
     );
 
-  // ==========================================================
-  // EXCHANGE CODE -> SESSION
-  // ==========================================================
+  // ==========================================================================
+  // 8. EXCHANGE AUTHORIZATION CODE -> SESSION
+  // ==========================================================================
 
   const {
     data,
-    error,
+    error:
+      exchangeError,
   } =
-    await supabase.auth.exchangeCodeForSession(
-      code
+    await supabase.auth
+      .exchangeCodeForSession(
+        code
+      );
+
+  // ==========================================================================
+  // 9. JIKA EXCHANGE GAGAL
+  // ==========================================================================
+
+  if (exchangeError) {
+    console.error(
+      "[AUTH CALLBACK] exchangeCodeForSession gagal:",
+      exchangeError
     );
 
-  if (error) {
-    console.error(
-      "[AUTH CALLBACK] exchange error:",
-      error
+    const loginUrl =
+      new URL(
+        "/login",
+        requestUrl.origin
+      );
+
+    loginUrl.searchParams.set(
+      "error",
+      exchangeError.message
     );
 
     return NextResponse.redirect(
-      new URL(
-        `/login?error=${encodeURIComponent(
-          error.message
-        )}`,
-        requestUrl.origin
-      )
+      loginUrl
     );
   }
 
-  if (!data.session) {
+  // ==========================================================================
+  // 10. PASTIKAN SESSION TERBENTUK
+  // ==========================================================================
+
+  if (
+    !data.session ||
+    !data.user
+  ) {
     console.error(
-      "[AUTH CALLBACK] Session tidak terbentuk."
+      "[AUTH CALLBACK] Login berhasil tetapi session/user tidak terbentuk."
+    );
+
+    const loginUrl =
+      new URL(
+        "/login",
+        requestUrl.origin
+      );
+
+    loginUrl.searchParams.set(
+      "error",
+      "session_not_created"
     );
 
     return NextResponse.redirect(
-      new URL(
-        "/login?error=no_session",
-        requestUrl.origin
-      )
+      loginUrl
     );
   }
 
-  // ==========================================================
-  // LOGIN BERHASIL
-  // ==========================================================
+  // ==========================================================================
+  // 11. LOG SUCCESS
+  // ==========================================================================
 
-  return NextResponse.redirect(
-    new URL(
-      next,
-      requestUrl.origin
-    )
+  console.log(
+    "[AUTH CALLBACK] Login berhasil:",
+    data.user.id
   );
-}// app/auth/callback/route.ts
 
-import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { createServerClient } from "@supabase/ssr";
-
-export async function GET(request: Request) {
-  const requestUrl = new URL(request.url);
-
-  const code =
-    requestUrl.searchParams.get("code");
-
-  const next =
-    requestUrl.searchParams.get("next") ||
-    "/akun";
-
-  // Kalau tidak ada code, langsung arahkan ke login
-  if (!code) {
-    return NextResponse.redirect(
-      new URL(
-        "/login?error=missing_code",
-        requestUrl.origin
-      )
-    );
-  }
-
-  const cookieStore =
-    await cookies();
-
-  const supabase =
-    createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return cookieStore.getAll();
-          },
-
-          setAll(cookiesToSet) {
-            try {
-              cookiesToSet.forEach(
-                ({
-                  name,
-                  value,
-                  options,
-                }) => {
-                  cookieStore.set(
-                    name,
-                    value,
-                    options
-                  );
-                }
-              );
-            } catch {
-              // Aman diabaikan pada context tertentu
-            }
-          },
-        },
-      }
-    );
-
-  // ==========================================================
-  // EXCHANGE CODE -> SESSION
-  // ==========================================================
-
-  const {
-    data,
-    error,
-  } =
-    await supabase.auth.exchangeCodeForSession(
-      code
-    );
-
-  if (error) {
-    console.error(
-      "[AUTH CALLBACK] exchange error:",
-      error
-    );
-
-    return NextResponse.redirect(
-      new URL(
-        `/login?error=${encodeURIComponent(
-          error.message
-        )}`,
-        requestUrl.origin
-      )
-    );
-  }
-
-  if (!data.session) {
-    console.error(
-      "[AUTH CALLBACK] Session tidak terbentuk."
-    );
-
-    return NextResponse.redirect(
-      new URL(
-        "/login?error=no_session",
-        requestUrl.origin
-      )
-    );
-  }
-
-  // ==========================================================
-  // LOGIN BERHASIL
-  // ==========================================================
+  // ==========================================================================
+  // 12. REDIRECT KE HALAMAN TUJUAN
+  // ==========================================================================
 
   return NextResponse.redirect(
     new URL(
